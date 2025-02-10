@@ -20,6 +20,7 @@ export class UserController {
   async getProfile(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
+
       const user = await this.userRepository.getUserById(id);
 
       if (!user) {
@@ -108,21 +109,18 @@ export class UserController {
   async updateUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { email, role } = req.body;
+      const { email, role,password } = req.body;
 
-      if (!req.user || (req.user.role !== 'admin' && req.user.id !== id)) {
-        res.status(403).json({ message: 'No tienes permisos para actualizar este usuario' });
+    // Actualizar el usuario
+    const userUpdated = await this.userRepository.updateUser(id, { email, role, password });
+
+      if (!userUpdated) {
+        res.status(500).json({ message: 'Error al actualizar el usuario' });
         return;
       }
 
-      const { data, error } = await supabase
-        .from('users')
-        .update({ email, role })
-        .eq('id', id);
-
-      if (error) throw new Error(error.message);
-
-      res.json({ message: 'Usuario actualizado', user: data });
+     // Respuesta exitosa    
+      res.status(201).json({ message: 'Usuario actualizado', user: userUpdated });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
