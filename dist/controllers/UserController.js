@@ -14,28 +14,51 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserController = void 0;
 const SupabaseClient_1 = __importDefault(require("../config/SupabaseClient"));
+const UserRepository_1 = require("../repository/UserRepository");
 class UserController {
+    constructor() {
+        /*
+          Global repositorys query
+        */
+        this.userRepository = new UserRepository_1.UserRepository();
+    }
     /**
-     * Obtener el perfil del usuario autenticado
+     * Obtener el perfil del usuario autenticado por el id
      */
     getProfile(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                if (!req.user) {
-                    res.status(401).json({ message: 'No autorizado' });
+                const { id } = req.params;
+                const user = yield this.userRepository.getUserById(id);
+                if (!user) {
+                    res.status(404).json({ message: 'Usuario no encontrado' });
                     return;
                 }
-                const { data, error } = yield SupabaseClient_1.default
-                    .from('users')
-                    .select('id, email, role')
-                    .eq('id', req.user.id)
-                    .single();
-                if (error)
-                    throw new Error(error.message);
-                res.json({ user: data });
+                res.json(user);
             }
-            catch (err) {
-                res.status(500).json({ error: err.message });
+            catch (error) {
+                console.error('Error en getProfile:', error);
+                res.status(500).json({ message: 'Error interno del servidor' });
+            }
+        });
+    }
+    /**
+   * Obtener el perfil del usuario autenticado por el email
+   */
+    getUserByEmail(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const { email } = req.params;
+                const user = yield this.userRepository.findByEmail(email);
+                if (!user) {
+                    res.status(404).json({ message: 'Usuario no encontrado' });
+                    return;
+                }
+                res.json(user);
+            }
+            catch (error) {
+                console.error('Error en getProfile:', error);
+                res.status(500).json({ message: 'Error interno del servidor' });
             }
         });
     }
@@ -70,6 +93,7 @@ class UserController {
                     return;
                 }
                 const { email, password, role } = req.body;
+                const response = yield this.userRepository.findByEmail(email);
                 if (!email || !password || !role) {
                     res.status(400).json({ message: 'Todos los campos son obligatorios' });
                     return;
