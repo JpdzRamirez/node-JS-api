@@ -86,13 +86,17 @@ class UserController {
                 if (existingUser) {
                     throw new Error("El email ya está registrado");
                 }
+                // Default mandatory data      
+                userData.role_id = 2;
                 // Hashear la contraseña antes de guardar
-                if (userData.name && !userData.password) {
+                if (userData.password) {
+                    userData.password = yield bcryptjs_1.default.hash(userData.password, 10);
+                }
+                else if (userData.name) {
                     userData.password = yield bcryptjs_1.default.hash(userData.name, 10);
                 }
                 // Crear el usuario en la base de datos
-                const newUser = yield this.userRepository.createUser(userData);
-                return newUser;
+                return yield this.userRepository.createUser(userData);
             }
             catch (error) {
                 throw error;

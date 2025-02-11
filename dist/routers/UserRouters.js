@@ -19,16 +19,17 @@ router.use('/users', AuthMiddleware_1.authenticateJWT, HandleValidationErrors_1.
 */
 // Subgrupo para rutas de administrador (admin)
 router.use('/users/admin', (0, RoleMiddleware_1.roleMiddleware)(['admin']));
-router.get('/users/admin', userController.getAllUsers.bind(userController));
-router.post('/users/admin', UserValidator_1.validateCreateUser, AuthController_1.AuthController.register.bind(AuthController_1.AuthController));
-router.delete('/users/admin/:id', UserValidator_1.validateDeleteUser, userController.deleteUser.bind(userController));
+router.get('/users/admin/get-users', userController.getAllUsers.bind(userController));
+router.post('/users/admin/create-user', UserValidator_1.validateCreateUser, AuthController_1.AuthController.register.bind(AuthController_1.AuthController));
+router.delete('/users/admin/get-profile/:id', UserValidator_1.validateGetUser, userController.getProfile.bind(userController));
+router.delete('/users/admin/delete-user/:id', UserValidator_1.validateDeleteUser, userController.deleteUser.bind(userController));
 //****************************************************************** */
 /*
   Agrupación rutas user
 */
 // Subgrupo para rutas de usuario (user)
 router.use('/users/profile', (0, RoleMiddleware_1.roleMiddleware)(['user']));
-router.get('/users/profile/:id', UserValidator_1.validateGetUser, userController.getProfile.bind(userController));
+router.get('/users/profile/get-profile/:id', UserValidator_1.validateGetUser, userController.getProfile.bind(userController));
 //****************************************************************** */
 /*
   Agrupación rutas compartidas

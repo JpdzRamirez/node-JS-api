@@ -8,20 +8,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const UserController_1 = require("../controllers/UserController");
 const UserRepository_1 = require("../repository/UserRepository");
 const SupabaseClient_1 = require("../config/SupabaseClient");
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
 class AuthService {
     static register(data) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                data.password = yield bcryptjs_1.default.hash(data.password, 10);
-                data.role_id = 2;
                 return yield this.userController.createUser(data);
             }
             catch (error) {
@@ -52,7 +46,7 @@ class AuthService {
                     throw new Error("No se pudo generar el token");
                 }
                 // Obtener información adicional del usuario desde la tabla `users`
-                const userTable = yield this.userRepository.getUserById(user.id); // Usar await aquí
+                const userTable = yield this.userRepository.getUserById(user.id); // Usar user.id
                 if (!userTable) {
                     throw new Error("Error al obtener información del usuario");
                 }
@@ -61,7 +55,8 @@ class AuthService {
                     token,
                     user: {
                         id: user.id,
-                        document: userTable.document, // Ahora puedes acceder a las propiedades
+                        id_authToken: user.id, // Usar user.id como id_authToken
+                        document: userTable.document,
                         email: user.email || "",
                         name: userTable.name,
                         lastname: userTable.lastname,

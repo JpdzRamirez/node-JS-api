@@ -30,11 +30,10 @@ router.use('/users', authenticateJWT,handleValidationErrors,);
 */
 // Subgrupo para rutas de administrador (admin)
 router.use('/users/admin', roleMiddleware(['admin']));
-router.get('/users/admin', userController.getAllUsers.bind(userController));
-
-router.post('/users/admin', validateCreateUser, AuthController.register.bind(AuthController));
-
-router.delete('/users/admin/:id', validateDeleteUser,userController.deleteUser.bind(userController));
+router.get('/users/admin/get-users', userController.getAllUsers.bind(userController));
+router.post('/users/admin/create-user', validateCreateUser, AuthController.register.bind(AuthController));
+router.delete('/users/admin/get-profile/:id', validateGetUser, userController.getProfile.bind(userController));
+router.delete('/users/admin/delete-user/:id', validateDeleteUser,userController.deleteUser.bind(userController));
 
 //****************************************************************** */
 
@@ -43,7 +42,7 @@ router.delete('/users/admin/:id', validateDeleteUser,userController.deleteUser.b
 */
 // Subgrupo para rutas de usuario (user)
 router.use('/users/profile', roleMiddleware(['user']));
-router.get('/users/profile/:id', validateGetUser, userController.getProfile.bind(userController));
+router.get('/users/profile/get-profile/:id', validateGetUser, userController.getProfile.bind(userController));
 
 //****************************************************************** */
 

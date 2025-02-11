@@ -1,4 +1,5 @@
 import { supabaseAnon, supabaseAdmin } from "../config/SupabaseClient";
+import { Client } from 'pg';
 import { APPUser } from "../models/UserModel";
 
 export class UserRepository {
@@ -8,22 +9,22 @@ export class UserRepository {
   async getUserById(id: string): Promise<APPUser | null> {
     try {
       const { data, error } = await supabaseAnon
-        .from("users")
-        .select("*")
-        .eq("id", id)
-        .single();
+      .from("users")
+      .select("*")
+      .eq("id_authToken", id) // Buscar por id_authToken
+      .single();
 
-      if (error) {
-        console.error("Error al obtener el usuario:", error);
-        return null;
-      }
+    if (error) {
+      console.error("Error al obtener el usuario:", error);
+      return null;
+    }
 
-      if (!data) {
-        console.log(`Usuario con id ${id} no encontrado.`);
-        return null;
-      }
+    if (!data) {
+      console.log(`Usuario con id ${id} no encontrado.`);
+      return null;
+    }
 
-      return data as APPUser;
+    return data as APPUser;
     } catch (error) {
       throw error;
     }
@@ -36,7 +37,7 @@ export class UserRepository {
         .from("users")
         .select("*")
         .eq("email", email)
-        .maybeSingle(); // ⚡️ Evita error si no hay resultados
+        .maybeSingle(); 
 
       if (error) {
         console.error("Error al obtener el usuario:", error);
@@ -76,50 +77,67 @@ export class UserRepository {
    * Crea un nuevo usuario
    */
   async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL, // Cadena de conexión de PostgreSQL
+    });
+
+    await client.connect();
+
     try {
+      // Iniciar transacción
+      await client.query('BEGIN');
+
       // Crear el usuario en Supabase Auth
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        phone: user.mobile,
         email: user.email,
-        password: user.password,
+        password: user.password as string,
         email_confirm: true, // Confirmar el correo automáticamente
         user_metadata: {
+          display_name: `${user.name} ${user.lastname}`,
           document: user.document,
           name: user.name,
           lastname: user.lastname,
           role_id: user.role_id,
-          phone: user.phone,
+          phone: user.mobile,
           mobile: user.mobile,
         },
       });
 
       if (authError) {
-        console.error("Error al crear el usuario en Supabase Auth:", authError);
-        return null;
+        throw new Error(`Error al crear el usuario en Supabase Auth: ${authError.message}`);
       }
+
       // Insertar el usuario en la tabla `users`
-      const { data: dbData, error: dbError } = await supabaseAdmin
-        .from("users")
-        .insert([{
-          id: authData.user.id,
-          document: user.document,
-          email: user.email,
-          name: user.name,
-          lastname: user.lastname,
-          role_id: user.role_id,
-          phone: user.phone,
-          mobile: user.mobile,
-        }])
-        .select()
-        .single();
+      const insertUserQuery = `
+        INSERT INTO users (id_authToken, document, email, name, lastname, role_id, phone, mobile, address)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *;
+      `;
+      const { rows } = await client.query(insertUserQuery, [
+        authData.user.id,
+        user.document,
+        user.email,
+        user.name,
+        user.lastname,
+        user.role_id,
+        user.phone,
+        user.mobile,
+        user.address,
+      ]);
 
-      if (dbError) {
-        console.error("Error al insertar el usuario en la base de datos:", dbError);
-        return null;
-      }
+      // Confirmar transacción
+      await client.query('COMMIT');
 
-      return dbData as APPUser;
-    } catch (error) {
+      return rows[0] as APPUser;
+    } catch (error: any) {
+      // Revertir transacción en caso de error
+      await client.query('ROLLBACK');
+      console.error("Error en la transacción:", error.message);
       throw error;
+    } finally {
+      // Cerrar conexión
+      await client.end();
     }
   }
 

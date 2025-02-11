@@ -20,7 +20,7 @@ class AuthController {
             try {
                 const allowedFields = [
                     "name", "lastname", "document", "phone", "mobile",
-                    "email", "password", "role_id"
+                    "email", "password", "role_id", "address"
                 ];
                 // 🔹 Filtramos solo los campos permitidos
                 const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
