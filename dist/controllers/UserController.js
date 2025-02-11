@@ -13,7 +13,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserController = void 0;
-const SupabaseClient_1 = __importDefault(require("../config/SupabaseClient"));
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const UserRepository_1 = require("../repository/UserRepository");
 class UserController {
     constructor() {
@@ -21,44 +21,41 @@ class UserController {
           Global repositorys query
         */
         this.userRepository = new UserRepository_1.UserRepository();
+        this.userRepository = new UserRepository_1.UserRepository();
     }
     /**
      * Obtener el perfil del usuario autenticado por el id
-     */
+    */
     getProfile(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
                 const user = yield this.userRepository.getUserById(id);
                 if (!user) {
-                    res.status(404).json({ message: 'Usuario no encontrado' });
+                    res.status(404).json({ message: "Usuario no encontrado" });
                     return;
                 }
-                res.json(user);
+                res.status(200).json(user);
             }
             catch (error) {
-                console.error('Error en getProfile:', error);
-                res.status(500).json({ message: 'Error interno del servidor' });
+                res.status(500).json({ message: "Error interno del servidor" });
             }
         });
     }
     /**
-   * Obtener el perfil del usuario autenticado por el email
-   */
-    getUserByEmail(req, res) {
+     * Obtener el perfil del usuario autenticado por el email
+     */
+    getUserByEmail(email) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                const { email } = req.params;
                 const user = yield this.userRepository.findByEmail(email);
                 if (!user) {
-                    res.status(404).json({ message: 'Usuario no encontrado' });
-                    return;
+                    throw new Error("El email no se encuentra registrado");
                 }
-                res.json(user);
+                return user;
             }
             catch (error) {
-                console.error('Error en getProfile:', error);
-                res.status(500).json({ message: 'Error interno del servidor' });
+                return null;
             }
         });
     }
@@ -68,89 +65,85 @@ class UserController {
     getAllUsers(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                if (!req.user || req.user.role !== 'admin') {
-                    res.status(403).json({ message: 'No tienes permisos' });
-                    return;
-                }
-                const { data, error } = yield SupabaseClient_1.default.from('users').select('id, email, role');
-                if (error)
-                    throw new Error(error.message);
-                res.json({ users: data });
+                // Obtener todos los usuarios
+                const users = yield this.userRepository.getAllUsers();
+                // Respuesta exitosa
+                res.status(201).json(users);
             }
-            catch (err) {
-                res.status(500).json({ error: err.message });
+            catch (error) {
+                res.status(500).json({ error: error.message });
             }
         });
     }
     /**
      * Crear un nuevo usuario (solo administradores)
      */
-    createUser(req, res) {
+    createUser(userData) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                if (!req.user || req.user.role !== 'admin') {
-                    res.status(403).json({ message: 'No tienes permisos para crear usuarios' });
-                    return;
+                // Verificar si el email ya está registrado
+                const existingUser = yield this.userRepository.findByEmail(userData.email);
+                if (existingUser) {
+                    throw new Error("El email ya está registrado");
                 }
-                const { email, password, role } = req.body;
-                const response = yield this.userRepository.findByEmail(email);
-                if (!email || !password || !role) {
-                    res.status(400).json({ message: 'Todos los campos son obligatorios' });
-                    return;
+                // Hashear la contraseña antes de guardar
+                if (userData.name && !userData.password) {
+                    userData.password = yield bcryptjs_1.default.hash(userData.name, 10);
                 }
-                const { data, error } = yield SupabaseClient_1.default.from('users').insert([{ email, password, role }]);
-                if (error)
-                    throw new Error(error.message);
-                res.status(201).json({ message: 'Usuario creado', user: data });
+                // Crear el usuario en la base de datos
+                const newUser = yield this.userRepository.createUser(userData);
+                return newUser;
             }
-            catch (err) {
-                res.status(500).json({ error: err.message });
+            catch (error) {
+                throw error;
             }
         });
     }
     /**
      * Actualizar un usuario (admin y el propio usuario)
-     */
+    */
     updateUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
-                const { email, role } = req.body;
-                if (!req.user || (req.user.role !== 'admin' && req.user.id !== id)) {
-                    res.status(403).json({ message: 'No tienes permisos para actualizar este usuario' });
+                // Definir los campos permitidos para evitar actualizaciones no deseadas
+                const allowedFields = ["email", "role", "password"];
+                const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
+                // Actualizar el usuario con los valores filtrados
+                const userUpdated = yield this.userRepository.updateUser(id, filteredBody);
+                if (!userUpdated) {
+                    res.status(500).json({ message: "Error al actualizar el usuario" });
                     return;
                 }
-                const { data, error } = yield SupabaseClient_1.default
-                    .from('users')
-                    .update({ email, role })
-                    .eq('id', id);
-                if (error)
-                    throw new Error(error.message);
-                res.json({ message: 'Usuario actualizado', user: data });
+                // Respuesta exitosa
+                res
+                    .status(201)
+                    .json({ message: "Usuario actualizado", user: userUpdated });
             }
-            catch (err) {
-                res.status(500).json({ error: err.message });
+            catch (error) {
+                res.status(500).json({ error: error.message });
             }
         });
     }
     /**
      * Eliminar un usuario (solo administradores)
-     */
+    */
     deleteUser(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 const { id } = req.params;
-                if (!req.user || req.user.role !== 'admin') {
-                    res.status(403).json({ message: 'No tienes permisos para eliminar usuarios' });
+                // Actualizar el usuario con los valores filtrados
+                const userDeleted = yield this.userRepository.deleteUser(id);
+                if (!userDeleted) {
+                    res.status(500).json({ message: "Error al crear el usuario" });
                     return;
                 }
-                const { data, error } = yield SupabaseClient_1.default.from('users').delete().eq('id', id);
-                if (error)
-                    throw new Error(error.message);
-                res.json({ message: 'Usuario eliminado', user: data });
+                res
+                    .status(201)
+                    .json({ message: "Usuario eliminado", check: userDeleted });
             }
-            catch (err) {
-                res.status(500).json({ error: err.message });
+            catch (error) {
+                res.status(500).json({ error: error.message });
             }
         });
     }

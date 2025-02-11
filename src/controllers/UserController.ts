@@ -1,11 +1,10 @@
-import { Request, Response } from 'express';
-import { validationResult } from "express-validator";
-import { AuthRequest } from '../middleware/AuthMiddleware';
-import supabase from '../config/SupabaseClient';
-import { UserRepository } from '../repository/UserRepository';
+import { Request, Response } from "express";
+import { APPUser } from "../models/UserModel";
+import { AuthRequest } from "../middleware/AuthMiddleware";
+import bcrypt from "bcryptjs";
+import { UserRepository } from "../repository/UserRepository";
 
 export class UserController {
-
   /*
     Global repositorys query
   */
@@ -16,47 +15,42 @@ export class UserController {
   }
   /**
    * Obtener el perfil del usuario autenticado por el id
-   */
-  async getProfile(req: AuthRequest, res: Response): Promise<void> {
+  */
+ 
+  async getProfile(req: AuthRequest, res: Response):Promise<void> {
     try {
       const { id } = req.params;
 
       const user = await this.userRepository.getUserById(id);
 
-      if (!user) {
-        res.status(404).json({ message: 'Usuario no encontrado' });
+      if (!user) {        
+        res.status(404).json({ message: "Usuario no encontrado" });
         return;
       }
 
-      res.json(user);
+      res.status(200).json(user);
 
-    } catch (error) {
-      console.error('Error en getProfile:', error);
-      res.status(500).json({ message: 'Error interno del servidor' });
+    } catch (error:any) {      
+      res.status(500).json({ message: "Error interno del servidor" });      
     }
   }
-    /**
+  /**
    * Obtener el perfil del usuario autenticado por el email
    */
-    async getUserByEmail(req: AuthRequest, res: Response): Promise<void> {
-      try {
-        const { email } = req.params;
-        const user = await this.userRepository.findByEmail(email);
-  
-        if (!user) {
-          res.status(404).json({ message: 'Usuario no encontrado' });
-          return;
-        }
-  
-        res.json(user);
-  
-      } catch (error) {
-        console.error('Error en getProfile:', error);
-        res.status(500).json({ message: 'Error interno del servidor' });
-      }
-    }
+  async getUserByEmail(email: string):Promise<APPUser | null> {
+    try {
+      
+      const user = await this.userRepository.findByEmail(email);
 
-  
+      if (!user) {
+        throw new Error("El email no se encuentra registrado");
+      }
+      return user;
+      
+    } catch (error:any) {      
+      return null;
+    }
+  }
 
   /**
    * Obtener todos los usuarios (solo para administradores)
@@ -75,76 +69,79 @@ export class UserController {
   /**
    * Crear un nuevo usuario (solo administradores)
    */
-  async createUser(req: AuthRequest, res: Response): Promise<void> {
+  async createUser(userData: Partial<APPUser>): Promise<APPUser | null> {
     try {
-      const { email, password, role } = req.body;
-
       // Verificar si el email ya está registrado
-      const existingUser = await this.userRepository.findByEmail(email);
-
+      const existingUser = await this.userRepository.findByEmail(userData.email as string);
       if (existingUser) {
-        res.status(400).json({ message: 'El email ya está registrado' });
-        return;
+        throw new Error("El email ya está registrado");
       }
-
-      // Crear el usuario
-      const newUser = await this.userRepository.createUser({ email, password, role });
-
-      if (!newUser) {
-        res.status(500).json({ message: 'Error al crear el usuario' });
-        return;
-      }
-
-      // Respuesta exitosa
-      res.status(201).json(newUser);
-
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+  
+      // Hashear la contraseña antes de guardar
+      if (userData.name && !userData.password) {
+        userData.password = await bcrypt.hash(userData.name, 10);
+      }      
+      
+      // Crear el usuario en la base de datos
+      const newUser = await this.userRepository.createUser(userData);
+      return newUser;
+    } catch (error:any) {
+      throw error;
     }
   }
 
   /**
    * Actualizar un usuario (admin y el propio usuario)
-   */
+  */
   async updateUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
-      const { email, role,password } = req.body;
+      // Definir los campos permitidos para evitar actualizaciones no deseadas
+      const allowedFields = ["email", "role", "password"];
+      const filteredBody = Object.fromEntries(
+        Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
+      );
 
-    // Actualizar el usuario
-    const userUpdated = await this.userRepository.updateUser(id, { email, role, password });
+      // Actualizar el usuario con los valores filtrados
+      const userUpdated = await this.userRepository.updateUser(
+        id,
+        filteredBody
+      );
 
       if (!userUpdated) {
-        res.status(500).json({ message: 'Error al actualizar el usuario' });
+        res.status(500).json({ message: "Error al actualizar el usuario" });
         return;
       }
 
-     // Respuesta exitosa    
-      res.status(201).json({ message: 'Usuario actualizado', user: userUpdated });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      // Respuesta exitosa
+      res
+        .status(201)
+        .json({ message: "Usuario actualizado", user: userUpdated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   }
 
   /**
    * Eliminar un usuario (solo administradores)
-   */
+  */
   async deleteUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const { id } = req.params;
 
-      if (!req.user || req.user.role !== 'admin') {
-        res.status(403).json({ message: 'No tienes permisos para eliminar usuarios' });
+      // Actualizar el usuario con los valores filtrados
+      const userDeleted = await this.userRepository.deleteUser(id);
+
+      if (!userDeleted) {
+        res.status(500).json({ message: "Error al crear el usuario" });
         return;
       }
 
-      const { data, error } = await supabase.from('users').delete().eq('id', id);
-
-      if (error) throw new Error(error.message);
-
-      res.json({ message: 'Usuario eliminado', user: data });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res
+        .status(201)
+        .json({ message: "Usuario eliminado", check: userDeleted });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   }
 }

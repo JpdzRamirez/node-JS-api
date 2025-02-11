@@ -12,30 +12,77 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const UserModel_1 = __importDefault(require("../models/UserModel"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const UserController_1 = require("../controllers/UserController");
+const UserRepository_1 = require("../repository/UserRepository");
+const SupabaseClient_1 = require("../config/SupabaseClient");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 class AuthService {
-    static register(email, password) {
+    static register(data) {
         return __awaiter(this, void 0, void 0, function* () {
-            const hashedPassword = yield bcryptjs_1.default.hash(password, 10);
-            return yield UserModel_1.default.createUser(email, hashedPassword);
+            try {
+                data.password = yield bcryptjs_1.default.hash(data.password, 10);
+                data.role_id = 2;
+                return yield this.userController.createUser(data);
+            }
+            catch (error) {
+                throw error;
+            }
         });
     }
-    static login(email, password) {
+    static login(data) {
         return __awaiter(this, void 0, void 0, function* () {
-            const user = yield UserModel_1.default.findByEmail(email);
-            if (!user)
-                throw new Error('Usuario no encontrado');
-            const validPassword = yield bcryptjs_1.default.compare(password, user.password);
-            if (!validPassword)
-                throw new Error('Contraseña incorrecta');
-            const token = jsonwebtoken_1.default.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, {
-                expiresIn: '1h',
-            });
-            return { token, user };
+            var _a;
+            try {
+                // Iniciar sesión con Supabase
+                const { data: authData, error } = yield SupabaseClient_1.supabaseAdmin.auth.signInWithPassword({
+                    email: data.email,
+                    password: data.password,
+                });
+                if (error) {
+                    throw new Error(error.message);
+                }
+                // Obtener el usuario autenticado
+                const user = authData.user;
+                if (!user) {
+                    throw new Error("Usuario no encontrado");
+                }
+                // Obtener el token de sesión
+                const token = (_a = authData.session) === null || _a === void 0 ? void 0 : _a.access_token;
+                if (!token) {
+                    throw new Error("No se pudo generar el token");
+                }
+                // Obtener información adicional del usuario desde la tabla `users`
+                const userTable = yield this.userRepository.getUserById(user.id); // Usar await aquí
+                if (!userTable) {
+                    throw new Error("Error al obtener información del usuario");
+                }
+                // Devolver el token y la información del usuario
+                return {
+                    token,
+                    user: {
+                        id: user.id,
+                        document: userTable.document, // Ahora puedes acceder a las propiedades
+                        email: user.email || "",
+                        name: userTable.name,
+                        lastname: userTable.lastname,
+                        role_id: userTable.role_id,
+                        phone: userTable.phone,
+                        mobile: userTable.mobile,
+                        created_at: userTable.created_at,
+                        updated_at: userTable.updated_at,
+                    },
+                };
+            }
+            catch (error) {
+                throw error;
+            }
         });
     }
 }
+/*
+    Global repositorys query
+*/
+AuthService.userController = new UserController_1.UserController();
+AuthService.userRepository = new UserRepository_1.UserRepository();
 exports.default = AuthService;
 //# sourceMappingURL=AuthService.js.map

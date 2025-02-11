@@ -12,26 +12,50 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.login = exports.register = void 0;
+exports.AuthController = void 0;
 const AuthService_1 = __importDefault(require("../services/AuthService"));
-const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const user = yield AuthService_1.default.register(req.body.email, req.body.password);
-        res.status(201).json(user);
+class AuthController {
+    static register(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const allowedFields = [
+                    "name", "lastname", "document", "phone", "mobile",
+                    "email", "password", "role_id"
+                ];
+                // 🔹 Filtramos solo los campos permitidos
+                const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
+                const user = yield AuthService_1.default.register(filteredBody);
+                res.status(201).json({ message: "Usuario registrado con éxito", user });
+            }
+            catch (error) {
+                res.status(400).json({ error: error.message });
+            }
+        });
     }
-    catch (err) {
-        res.status(400).json({ error: err.message });
+    static login(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const allowedFields = ["email", "password"];
+                function isLoginData(obj) {
+                    return (typeof obj.email === "string" && typeof obj.password === "string");
+                }
+                const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
+                if (!isLoginData(filteredBody)) {
+                    throw new Error("Error en datos suministrados");
+                }
+                const result = yield AuthService_1.default.login(filteredBody);
+                if (!result) {
+                    res.status(401).json({ error: "Credenciales inválidas" });
+                    return;
+                }
+                const { token, user } = result;
+                res.json({ message: "Login exitoso", token, user });
+            }
+            catch (error) {
+                res.status(401).json({ error: error.message });
+            }
+        });
     }
-});
-exports.register = register;
-const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const { token, user } = yield AuthService_1.default.login(req.body.email, req.body.password);
-        res.json({ token, user });
-    }
-    catch (err) {
-        res.status(400).json({ error: err.message });
-    }
-});
-exports.login = login;
+}
+exports.AuthController = AuthController;
 //# sourceMappingURL=AuthController.js.map

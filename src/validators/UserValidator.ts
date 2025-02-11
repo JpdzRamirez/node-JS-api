@@ -4,7 +4,6 @@ import { body, param } from "express-validator";
 
 // ✅ Validación para crear usuario
 export const validateCreateUser = [
-  // ✅ Validar email (sin espacios, formato correcto)
   body("email")
     .trim()
     .isEmail()
@@ -16,7 +15,6 @@ export const validateCreateUser = [
       return true;
     }),
 
-  // ✅ Validar contraseña (mínimo 6 caracteres, al menos 1 número, 1 mayúscula y 1 carácter especial)
   body("password")
     .trim()
     .isLength({ min: 6 })
@@ -35,9 +33,28 @@ export const validateCreateUser = [
       }
       return true;
     }),
+    body("name").isString().notEmpty().withMessage("El nombre es obligatorio"),
+    body("lastname")
+      .isString()
+      .notEmpty()
+      .withMessage("El apellido es obligatorio"),
+    body("document")
+      .isNumeric()
+      .notEmpty()
+      .withMessage("El documento es obligatorio"),
+    body("phone")
+      .optional()
+      .isString()
+      .withMessage("El teléfono debe ser una cadena de texto"),
+    body("mobile")
+      .isString()
+      .notEmpty()
+      .withMessage("El móvil es obligatorio"),
+    body("role_id")
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage("El rol debe ser un número entero positivo"),
 
-  // ✅ Validar el rol (solo "user" o "admin")
-  body("role").isIn(["user", "admin"]).withMessage("Rol inválido"),
 ];
 
 //************************************************************************** */
@@ -87,6 +104,12 @@ export const validateUpdateUser = [
 // ✅ Validación para obtener usuario por ID
 export const validateGetUser = [
   param("id").isUUID().withMessage("El ID no existe en los registros"),
+];
+
+// ✅ Validación para obtener usuario por emails
+export const validateLoginUser = [
+  body("email").isEmail().withMessage("El email proporcionado no es válido"),
+  body("password").notEmpty().withMessage("La contraseña no fué proporcionada"),
 ];
 
 //************************************************************************** */

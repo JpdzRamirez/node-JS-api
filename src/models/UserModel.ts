@@ -1,8 +1,13 @@
 export interface APPUser {
   id: string;
+  document:string;
   email: string;
   password?: string; // Normalmente no se almacena ni se devuelve desde la API
-  role: string;
-  created_at?: string; // Si Supabase almacena la fecha de creación
-  updated_at?: string; // Si manejas fecha de actualización
+  name:string;
+  lastname:string;
+  role_id:number;
+  phone:string;
+  mobile?:string;
+  created_at?: Date; // Si Supabase almacena la fecha de creación
+  updated_at?: Date; // Si manejas fecha de actualización
 }
