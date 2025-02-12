@@ -8,12 +8,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserController = void 0;
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const UserRepository_1 = require("../repository/UserRepository");
 class UserController {
     constructor() {
@@ -78,25 +74,16 @@ class UserController {
     /**
      * Crear un nuevo usuario (solo administradores)
      */
-    createUser(userData) {
+    createUser(user) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 // Verificar si el email ya está registrado
-                const existingUser = yield this.userRepository.findByEmail(userData.email);
+                const existingUser = yield this.userRepository.findByEmail(user.email);
                 if (existingUser) {
                     throw new Error("El email ya está registrado");
                 }
-                // Default mandatory data      
-                userData.role_id = 2;
-                // Hashear la contraseña antes de guardar
-                if (userData.password) {
-                    userData.password = yield bcryptjs_1.default.hash(userData.password, 10);
-                }
-                else if (userData.name) {
-                    userData.password = yield bcryptjs_1.default.hash(userData.name, 10);
-                }
                 // Crear el usuario en la base de datos
-                return yield this.userRepository.createUser(userData);
+                return yield this.userRepository.createUser(user);
             }
             catch (error) {
                 throw error;
@@ -111,7 +98,7 @@ class UserController {
             try {
                 const { id } = req.params;
                 // Definir los campos permitidos para evitar actualizaciones no deseadas
-                const allowedFields = ["email", "role", "password"];
+                const allowedFields = ["email", "document", "role", "password", "address", "mobile", "phone"];
                 const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
                 // Actualizar el usuario con los valores filtrados
                 const userUpdated = yield this.userRepository.updateUser(id, filteredBody);

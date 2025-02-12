@@ -1,6 +1,8 @@
 import { Request, Response } from "express";
 import AuthService from "../services/AuthService";
-import { LoginData, RegisterData } from "../types";
+import { LoginData } from "../types";
+import { APPUser } from "../models/UserModel";
+import { AuthRequest } from '../middleware/AuthMiddleware';
 
 export class AuthController {
   static async register(req: Request, res: Response) {
@@ -11,13 +13,18 @@ export class AuthController {
       ];
       
       // 🔹 Filtramos solo los campos permitidos
-      const filteredBody: Partial<RegisterData> = Object.fromEntries(
+      const filteredBody = Object.fromEntries(
         Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
-      );
+      ) as Partial<APPUser>;
 
-      const user = await AuthService.register(filteredBody as RegisterData);
+      const user = await AuthService.userBuilder(filteredBody);
+
+      if (!user) {
+        res.status(400).json({ error: "No se pudo crear el usuario" });
+      }
 
       res.status(201).json({ message: "Usuario registrado con éxito", user });
+
     } catch (error:any) {
       res.status(400).json({ error: (error as Error).message });
     }
@@ -54,4 +61,21 @@ export class AuthController {
       res.status(401).json({ error: (error as Error).message });
     }
   }
+  static async logout(req: AuthRequest, res: Response): Promise<void> {
+    if (!req.user || !req.user.id) {
+      res.status(401).json({ message: 'Usuario no autenticado' });
+      return;
+    }
+    // Revocar sesión actual
+    const result = await AuthService.logout(req.user.id);
+    
+    if (!result) {
+      res.status(500).json({ message: 'Error al cerrar sesión' });
+      return 
+    }
+  
+    res.json({ message: 'Sesión cerrada correctamente' });
+  };
+  
 }
+

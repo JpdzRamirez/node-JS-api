@@ -33,28 +33,36 @@ export const validateCreateUser = [
       }
       return true;
     }),
-    body("name").isString().notEmpty().withMessage("El nombre es obligatorio"),
-    body("lastname")
-      .isString()
-      .notEmpty()
-      .withMessage("El apellido es obligatorio"),
-    body("document")
-      .isNumeric()
-      .notEmpty()
-      .withMessage("El documento es obligatorio"),
-    body("phone")
-      .optional()
-      .isString()
-      .withMessage("El teléfono debe ser una cadena de texto"),
-    body("mobile")
-      .isString()
-      .notEmpty()
-      .withMessage("El móvil es obligatorio"),
-    body("role_id")
-      .optional()
-      .isInt({ min: 1 })
-      .withMessage("El rol debe ser un número entero positivo"),
-
+  body("name")
+    .isString()
+    .notEmpty()
+    .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
+    .withMessage("El nombre es obligatorio"),
+  body("lastname")
+    .optional()
+    .isString()
+    .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
+    .withMessage("El apellido solo debe contener letras y espacios"),
+  body("document")
+    .isNumeric()
+    .withMessage("El documento debe ser un número")
+    .custom((value) => {
+      if (!/^\d+$/.test(value)) {
+        throw new Error("El documento solo debe contener números");
+      }
+      return true;
+    })
+    .notEmpty()
+    .withMessage("El documento no puede estar vacío"),
+  body("phone")
+    .optional()
+    .isString()
+    .withMessage("El teléfono debe ser una cadena de texto"),
+  body("mobile").isString().notEmpty().withMessage("El móvil es obligatorio"),
+  body("role_id")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("El rol debe ser un número entero positivo"),
 ];
 
 //************************************************************************** */
@@ -94,9 +102,40 @@ export const validateUpdateUser = [
       }
       return true;
     }),
-
+  body("lastname")
+    .optional()
+    .isString()
+    .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
+    .withMessage("El apellido solo debe contener letras y espacios"),
+  body("document")
+    .isNumeric()
+    .withMessage("El documento debe ser un número")
+    .custom((value) => {
+      if (!/^\d+$/.test(value)) {
+        throw new Error("El documento solo debe contener números");
+      }
+      return true;
+    })
+    .notEmpty()
+    .withMessage("El documento no puede estar vacío"),
+  body("phone")
+    .optional()
+    .matches(/^\d+$/)
+    .withMessage("El telefono debe ser una cadena de texto"),
+  body("mobile")
+    .optional()
+    .isString()
+    .matches(/^\d+$/)
+    .withMessage("El movil es obligatorio"),
+  body("address")
+    .optional()
+    .isString()
+    .withMessage("El address es obligatorio"),
   // ✅ Validar el rol si se envía
-  body("role").optional().isIn(["user", "admin"]).withMessage("Rol inválido"),
+  body("role")
+    .optional()
+    .isIn(["user", "admin", "guest"])
+    .withMessage("Rol inválido"),
 ];
 
 //************************************************************************** */

@@ -1,57 +1,83 @@
 import { supabaseAnon, supabaseAdmin } from "../config/SupabaseClient";
-import { Client } from 'pg';
+import postgreSQLPOOL from "../config/PostgreSQLClient";
 import { APPUser } from "../models/UserModel";
+
+import bcrypt from "bcryptjs";
 
 export class UserRepository {
   /**
    * Obtiene un usuario por su ID
    */
   async getUserById(id: string): Promise<APPUser | null> {
+    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
-      const { data, error } = await supabaseAnon
-      .from("users")
-      .select("*")
-      .eq("id_authToken", id) // Buscar por id_authToken
-      .single();
+      await client.query("BEGIN"); // 🔹 Iniciar transacción
 
-    if (error) {
-      console.error("Error al obtener el usuario:", error);
-      return null;
-    }
+      const res = await client.query(
+        `
+        SELECT 
+          users.*, 
+          json_build_object(
+            'id', roles.id,
+            'name', roles.name              
+          ) AS role
+        FROM users
+        LEFT JOIN roles ON users.role_id = roles.id
+        WHERE users.id = $1
+        LIMIT 1;
+      `,
+        [id]
+      );
 
-    if (!data) {
-      console.log(`Usuario con id ${id} no encontrado.`);
-      return null;
-    }
+      if (res.rows.length === 0) {
+        throw new Error("No se encontró usuario.");
+      }
 
-    return data as APPUser;
+      await client.query("COMMIT"); // 🔹 Confirmar transacción
+      return res.rows[0];
     } catch (error) {
+      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
+      console.error("❌ Error en la transacción:", error);
       throw error;
+    } finally {
+      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
   /*Get by Email*/
   async findByEmail(email: string): Promise<APPUser | null> {
+    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
-      const { data, error } = await supabaseAnon
-        .from("users")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle(); 
+      await client.query("BEGIN"); // 🔹 Iniciar transacción
 
-      if (error) {
-        console.error("Error al obtener el usuario:", error);
-        return null;
+      const res = await client.query(
+        `
+        SELECT 
+          users.*, 
+          json_build_object(
+            'id', roles.id,
+            'name', roles.name              
+          ) AS role
+        FROM users
+        LEFT JOIN roles ON users.role_id = roles.id
+        WHERE users.email = $1
+        LIMIT 1;
+      `,
+        [email]
+      );
+
+      if (res.rows.length === 0) {
+        throw new Error("No se encontró usuario.");
       }
 
-      if (!data) {
-        console.log(`Usuario con email ${email} no encontrado.`);
-        return null;
-      }
-
-      return data as APPUser;
+      await client.query("COMMIT"); // 🔹 Confirmar transacción
+      return res.rows[0];
     } catch (error) {
+      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
+      console.error("❌ Error en la transacción:", error);
       throw error;
+    } finally {
+      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
@@ -59,17 +85,37 @@ export class UserRepository {
    * Obtiene todos los usuarios
    */
   async getAllUsers(): Promise<APPUser[]> {
+    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
-      const { data, error } = await supabaseAnon.from("users").select("*");
+      await client.query("BEGIN"); // 🔹 Iniciar transacción
 
-      if (error) {
-        console.error("Error al obtener usuarios:", error);
-        return [];
+      const res = await client.query(
+        `
+        SELECT 
+        users.*, 
+        json_build_object(
+            'id', roles.id,
+            'name', roles.name              
+        ) AS role
+        FROM users
+        LEFT JOIN roles ON users.role_id = roles.id
+        LIMIT 1;
+      `
+      );
+
+      if (res.rows.length === 0) {
+        throw new Error("No se encontró usuario.");
       }
 
-      return data as APPUser[];
+      await client.query("COMMIT"); // 🔹 Confirmar transacción
+
+      return res.rows[0];
     } catch (error) {
+      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
+      console.error("❌ Error en la transacción:", error);
       throw error;
+    } finally {
+      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
@@ -77,67 +123,84 @@ export class UserRepository {
    * Crea un nuevo usuario
    */
   async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL, // Cadena de conexión de PostgreSQL
-    });
-
-    await client.connect();
+    const client = await postgreSQLPOOL.connect(); // 🔹 Conexión al pool de PostgreSQL
+    let authUserId: string | null = null; // ✅ Definir authUserId fuera del try
 
     try {
-      // Iniciar transacción
-      await client.query('BEGIN');
+      await client.query("BEGIN"); // 🔹 Iniciar transacción en `public.users`
 
-      // Crear el usuario en Supabase Auth
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        phone: user.mobile,
-        email: user.email,
+      // 🔹 Crear usuario en Supabase Auth
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+        phone: user.mobile ?? "",
+        email: user.email ?? "",
         password: user.password as string,
-        email_confirm: true, // Confirmar el correo automáticamente
+        email_confirm: true,
         user_metadata: {
-          display_name: `${user.name} ${user.lastname}`,
-          document: user.document,
-          name: user.name,
-          lastname: user.lastname,
-          role_id: user.role_id,
-          phone: user.mobile,
-          mobile: user.mobile,
+          display_name: `${user.name ?? ""} ${user.lastname ?? ""}`,
+          document: user.document ?? "",
+          name: user.name ?? "",
+          lastname: user.lastname ?? "",
+          role_id: user.role_id ?? 0,
+          phone: user.mobile ?? "",
+          mobile: user.mobile ?? "",
         },
       });
 
-      if (authError) {
-        throw new Error(`Error al crear el usuario en Supabase Auth: ${authError.message}`);
+      if (error || !data?.user) {
+        throw new Error(
+          `Error en Supabase Auth: ${
+            error?.message || "No se pudo crear el usuario"
+          }`
+        );
       }
 
-      // Insertar el usuario en la tabla `users`
-      const insertUserQuery = `
-        INSERT INTO users (id_authToken, document, email, name, lastname, role_id, phone, mobile, address)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      authUserId = data.user.id;
+
+      // 🔹 Hashear la contraseña antes de guardar en `public.users`
+      user.password = user.password ? await bcrypt.hash(user.password, 10) : "";
+
+      // 🔹 Insertar usuario en `public.users`
+      const insertQuery = `
+        INSERT INTO public.users (id_authtoken, document, email, name, lastname, role_id, phone, mobile, address, password)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *;
       `;
-      const { rows } = await client.query(insertUserQuery, [
-        authData.user.id,
-        user.document,
-        user.email,
-        user.name,
-        user.lastname,
-        user.role_id,
-        user.phone,
-        user.mobile,
-        user.address,
-      ]);
 
-      // Confirmar transacción
-      await client.query('COMMIT');
+      const values = [
+        authUserId,
+        user.document ?? "",
+        user.email ?? "",
+        user.name ?? "",
+        user.lastname ?? "",
+        user.role_id ?? 2,
+        user.phone ?? "",
+        user.mobile ?? "",
+        user.address ?? "",
+        user.password ?? "",
+      ];
 
-      return rows[0] as APPUser;
-    } catch (error: any) {
-      // Revertir transacción en caso de error
-      await client.query('ROLLBACK');
-      console.error("Error en la transacción:", error.message);
+      const result = await client.query(insertQuery, values);
+
+      if (result.rows.length === 0) {
+        throw new Error("No se pudo crear el usuario en la base de datos.");
+      }
+
+      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
+      return result.rows[0];
+    } catch (error) {
+      await client.query("ROLLBACK"); // 🔹 Revertir cambios en `public.users`
+
+      console.error("❌ Error al crear usuario:", error);
+
+      if (authUserId) {
+        // 🔹 Si la transacción en `public.users` falló, eliminar usuario en `auth.users`
+        console.log("🗑 Eliminando usuario en auth.users...");
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
+      }
+
       throw error;
     } finally {
-      // Cerrar conexión
-      await client.end();
+      client.release(); // 🔹 Liberar conexión
     }
   }
 
@@ -148,25 +211,66 @@ export class UserRepository {
     id: string,
     user: Partial<APPUser>
   ): Promise<APPUser | null> {
-    // Agregar la fecha de actualización
-    user.updated_at = new Date();
-    try {
-      // Actualizar
-      const { data, error } = await supabaseAdmin
-        .from("users")
-        .update(user)
-        .eq("id", id)
-        .select()
-        .single();
+    const client = await postgreSQLPOOL.connect();
 
-      if (error) {
-        console.error("Error al actualizar el usuario:", error);
-        return null;
+    try {
+      await client.query("BEGIN"); // Inicia la transacción
+
+      // 🔹 1. Actualizar `public.users`
+      user.updated_at = new Date(); // Agregar la fecha de actualización
+
+      const fields = Object.keys(user)
+        .map((key, i) => `${key} = $${i + 2}`)
+        .join(", ");
+      const values = Object.values(user);
+
+      const { rows: updatedUserData } = await client.query(
+        `UPDATE users SET ${fields} WHERE id = $1 RETURNING *`,
+        [id, ...values]
+      );
+
+      if (updatedUserData.length === 0) {
+        throw new Error("No se pudo actualizar el usuario en public.users.");
       }
 
-      return data as APPUser;
+      const updatedUser = updatedUserData[0];
+
+      // 🔹 2. Actualizar `auth.users` en Supabase
+      const authUpdates = {
+        email: user.email,
+        password: user.password,
+        phone: user.mobile,
+        user_metadata: {
+          display_name: `${user.name ?? ""} ${user.lastname ?? ""}`,
+          document: user.document,
+          name: user.name,
+          lastname: user.lastname,
+          role_id: user.role_id,
+          phone: user.mobile,
+          mobile: user.mobile,
+        },
+      };
+
+      const { error: authError } =
+        await supabaseAdmin.auth.admin.updateUserById(
+          updatedUser.uuid_authSupa,
+          authUpdates
+        );
+
+      if (authError) {
+        throw new Error(
+          `Error al actualizar en auth.users: ${authError.message}`
+        );
+      }
+
+      await client.query("COMMIT"); // Confirmar la transacción
+      return updatedUser; // Retornar el usuario actualizado
     } catch (error) {
-      throw error;
+      await client.query("ROLLBACK"); // Revertir la transacción en caso de error
+      console.error("Error al actualizar usuario:", error);
+      return null;
+    } finally {
+      client.release(); // Liberar el cliente de la pool
     }
   }
 
@@ -174,17 +278,43 @@ export class UserRepository {
    * Elimina un usuario por su ID
    */
   async deleteUser(id: string): Promise<boolean> {
+    const client = await postgreSQLPOOL.connect(); // 🔹 Conectar al pool de PostgreSQL
     try {
-      const { error } = await supabaseAdmin.from("users").delete().eq("id", id);
+      await client.query("BEGIN"); // 🔹 Iniciar transacción
+
+      // 🔹 Obtener el ID de auth antes de eliminar el usuario en public.users
+      const { rows } = await client.query(
+        "SELECT id_authtoken FROM public.users WHERE id = $1",
+        [id]
+      );
+
+      if (rows.length === 0) {
+        throw new Error("Usuario no encontrado en base de datos");
+      }
+
+      const authUserId = rows[0].uuid_authSupa;
+
+      // 🔹 Eliminar usuario de public.users
+      const deleteQuery = "DELETE FROM public.users WHERE id = $1";
+      await client.query(deleteQuery, [id]);
+
+      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
+
+      // 🔹 Intentar eliminar el usuario de auth.users
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
 
       if (error) {
-        console.error("Error al eliminar el usuario:", error);
+        console.error("⚠ Error eliminando en auth.users:", error.message);
         return false;
       }
 
       return true;
     } catch (error) {
-      throw error;
+      await client.query("ROLLBACK"); // 🔹 Revertir transacción si falla
+      console.error("❌ Error eliminando usuario:", error);
+      return false;
+    } finally {
+      client.release(); // 🔹 Liberar conexión
     }
   }
 }

@@ -1,16 +1,17 @@
-export interface LoginData {
+interface LoginData {
   email: string;
   password: string;
 }
 
-export interface RegisterData {
-    name: string;
-    lastname: string;
-    document: string;
-    phone?: string;
-    mobile: string;
-    email: string;
-    password: string;
-    role_id?:number;
-  }
-  
+interface RegisterData {
+  name: string;
+  lastname: string;
+  document: string;
+  phone?: string;
+  mobile: string;
+  email: string;
+  password: string;
+  role_id?: number;
+}
+
+export {LoginData, RegisterData };

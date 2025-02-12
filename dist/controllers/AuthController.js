@@ -24,7 +24,10 @@ class AuthController {
                 ];
                 // 🔹 Filtramos solo los campos permitidos
                 const filteredBody = Object.fromEntries(Object.entries(req.body).filter(([key]) => allowedFields.includes(key)));
-                const user = yield AuthService_1.default.register(filteredBody);
+                const user = yield AuthService_1.default.userBuilder(filteredBody);
+                if (!user) {
+                    res.status(400).json({ error: "No se pudo crear el usuario" });
+                }
                 res.status(201).json({ message: "Usuario registrado con éxito", user });
             }
             catch (error) {
@@ -56,6 +59,22 @@ class AuthController {
             }
         });
     }
+    static logout(req, res) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!req.user || !req.user.id) {
+                res.status(401).json({ message: 'Usuario no autenticado' });
+                return;
+            }
+            // Revocar sesión actual
+            const result = yield AuthService_1.default.logout(req.user.id);
+            if (!result) {
+                res.status(500).json({ message: 'Error al cerrar sesión' });
+                return;
+            }
+            res.json({ message: 'Sesión cerrada correctamente' });
+        });
+    }
+    ;
 }
 exports.AuthController = AuthController;
 //# sourceMappingURL=AuthController.js.map

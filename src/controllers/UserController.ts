@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { APPUser } from "../models/UserModel";
 import { AuthRequest } from "../middleware/AuthMiddleware";
-import bcrypt from "bcryptjs";
 import { UserRepository } from "../repository/UserRepository";
 
 export class UserController {
@@ -17,7 +16,7 @@ export class UserController {
    * Obtener el perfil del usuario autenticado por el id
   */
  
-  async getProfile(req: AuthRequest, res: Response):Promise<void> {
+  async getProfile(req: Request, res: Response):Promise<void> {
     try {
       const { id } = req.params;
 
@@ -69,23 +68,18 @@ export class UserController {
   /**
    * Crear un nuevo usuario (solo administradores)
    */
-  async createUser(userData: Partial<APPUser>): Promise<APPUser | null> {
+  async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
     try {
       // Verificar si el email ya está registrado
-      const existingUser = await this.userRepository.findByEmail(userData.email as string);
+      const existingUser = await this.userRepository.findByEmail(user.email as string);
+
       if (existingUser) {
         throw new Error("El email ya está registrado");
       }
-      // Default mandatory data      
-      userData.role_id = 2;
-      // Hashear la contraseña antes de guardar
-      if (userData.password) {
-        userData.password = await bcrypt.hash(userData.password, 10);
-      } else if (userData.name) {
-        userData.password = await bcrypt.hash(userData.name, 10);
-      }        
+    
       // Crear el usuario en la base de datos
-      return await this.userRepository.createUser(userData);
+      return await this.userRepository.createUser(user);
+      
     } catch (error:any) {
       throw error;
     }
@@ -98,7 +92,8 @@ export class UserController {
     try {
       const { id } = req.params;
       // Definir los campos permitidos para evitar actualizaciones no deseadas
-      const allowedFields = ["email", "role", "password"];
+
+      const allowedFields = ["email","document" ,"role", "password","address","mobile","phone"];
       const filteredBody = Object.fromEntries(
         Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
       );
@@ -131,7 +126,7 @@ export class UserController {
       const { id } = req.params;
 
       // Actualizar el usuario con los valores filtrados
-      const userDeleted = await this.userRepository.deleteUser(id);
+      const userDeleted = await this.userRepository.deleteUser(id as string);
 
       if (!userDeleted) {
         res.status(500).json({ message: "Error al crear el usuario" });

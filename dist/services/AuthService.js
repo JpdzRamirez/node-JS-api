@@ -13,20 +13,70 @@ const UserController_1 = require("../controllers/UserController");
 const UserRepository_1 = require("../repository/UserRepository");
 const SupabaseClient_1 = require("../config/SupabaseClient");
 class AuthService {
-    static register(data) {
+    static userBuilder(data) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                return yield this.userController.createUser(data);
+                const user = yield this.userController.createUser(data);
+                if (!user) {
+                    throw new Error("No se pudo crear el usuario");
+                }
+                return user;
             }
             catch (error) {
-                throw error;
+                throw new Error(error.message);
             }
         });
     }
+    static logout(userId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                // 🔍 Buscar las sesiones activas del usuario en `auth.sessions`
+                const { data: sessions, error: sessionError } = yield SupabaseClient_1.supabaseAdmin
+                    .from('auth.sessions')
+                    .select('id')
+                    .eq('user_id', userId);
+                if (sessionError) {
+                    console.error("❌ Error al obtener sesiones:", sessionError);
+                    return false;
+                }
+                if (!sessions || sessions.length === 0) {
+                    console.warn("⚠️ No hay sesiones activas para cerrar.");
+                    return true;
+                }
+                // ❌ Eliminar todas las sesiones activas del usuario
+                const { error: deleteError } = yield SupabaseClient_1.supabaseAdmin
+                    .from('auth.sessions')
+                    .delete()
+                    .eq('user_id', userId);
+                if (deleteError) {
+                    console.error("❌ Error al cerrar sesión en Supabase:", deleteError);
+                    return false;
+                }
+                return true;
+            }
+            catch (error) {
+                console.error("❌ Error interno en logout:", error);
+                return false;
+            }
+        });
+    }
+    ;
     static login(data) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
             try {
+                // 🔹 Buscar al usuario en `auth.users` por email
+                const { data: userAuth, error: userAuthError } = yield SupabaseClient_1.supabaseAdmin
+                    .from("auth.users")
+                    .select("id, email")
+                    .eq("email", data.email)
+                    .single();
+                if (userAuthError || !userAuth) {
+                    throw new Error("Usuario no encontrado en Supabase Auth");
+                }
+                const userId = userAuth.id;
+                // Eliminar todas las sesiones previas del usuario
+                yield SupabaseClient_1.supabaseAdmin.from('auth.sessions').delete().eq('user_id', userId);
                 // Iniciar sesión con Supabase
                 const { data: authData, error } = yield SupabaseClient_1.supabaseAdmin.auth.signInWithPassword({
                     email: data.email,
@@ -46,7 +96,16 @@ class AuthService {
                     throw new Error("No se pudo generar el token");
                 }
                 // Obtener información adicional del usuario desde la tabla `users`
-                const userTable = yield this.userRepository.getUserById(user.id); // Usar user.id
+                const userTable = yield this.userRepository
+                    .findByEmail(user.email)
+                    .then((user) => {
+                    console.log("🟢 Usuario obtenido:", user);
+                    return user;
+                })
+                    .catch((error) => {
+                    console.error("❌ Error en findByEmail:", error);
+                    return null;
+                });
                 if (!userTable) {
                     throw new Error("Error al obtener información del usuario");
                 }
@@ -54,8 +113,8 @@ class AuthService {
                 return {
                     token,
                     user: {
-                        id: user.id,
-                        id_authToken: user.id, // Usar user.id como id_authToken
+                        id: userTable.id,
+                        uuid_authSupa: user.id,
                         document: userTable.document,
                         email: user.email || "",
                         name: userTable.name,
@@ -65,6 +124,13 @@ class AuthService {
                         mobile: userTable.mobile,
                         created_at: userTable.created_at,
                         updated_at: userTable.updated_at,
+                        roles: userTable.roles
+                            ? {
+                                // Verifica si la relación existe antes de acceder
+                                id: userTable.roles.id,
+                                name: userTable.roles.name,
+                            }
+                            : null,
                     },
                 };
             }
