@@ -16,7 +16,7 @@ router.post('/register',validateCreateUser ,handleValidationErrors,AuthControlle
 
 router.post('/login', validateLoginUser, handleValidationErrors, AuthController.login.bind(AuthController));
 
-router.post('/logout', validateLoginUser,authenticateJWT ,handleValidationErrors, AuthController.logout.bind(AuthController));
+router.post('/logout',authenticateJWT ,handleValidationErrors, AuthController.logout.bind(AuthController));
 
 
 

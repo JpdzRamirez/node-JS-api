@@ -10,7 +10,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const UserController_1 = require("../controllers/UserController");
-const UserRepository_1 = require("../repository/UserRepository");
 const SupabaseClient_1 = require("../config/SupabaseClient");
 class AuthService {
     static userBuilder(data) {
@@ -30,27 +29,10 @@ class AuthService {
     static logout(userId) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                // 🔍 Buscar las sesiones activas del usuario en `auth.sessions`
-                const { data: sessions, error: sessionError } = yield SupabaseClient_1.supabaseAdmin
-                    .from('auth.sessions')
-                    .select('id')
-                    .eq('user_id', userId);
-                if (sessionError) {
-                    console.error("❌ Error al obtener sesiones:", sessionError);
-                    return false;
-                }
-                if (!sessions || sessions.length === 0) {
-                    console.warn("⚠️ No hay sesiones activas para cerrar.");
-                    return true;
-                }
-                // ❌ Eliminar todas las sesiones activas del usuario
-                const { error: deleteError } = yield SupabaseClient_1.supabaseAdmin
-                    .from('auth.sessions')
-                    .delete()
-                    .eq('user_id', userId);
-                if (deleteError) {
-                    console.error("❌ Error al cerrar sesión en Supabase:", deleteError);
-                    return false;
+                // 🔍 Buscar las sesiones activas del usuario en `auth.sessions`      
+                const { error } = yield SupabaseClient_1.supabaseAdmin.auth.admin.signOut(userId);
+                if (error) {
+                    throw new Error(error.message);
                 }
                 return true;
             }
@@ -60,23 +42,10 @@ class AuthService {
             }
         });
     }
-    ;
     static login(data) {
         return __awaiter(this, void 0, void 0, function* () {
             var _a;
             try {
-                // 🔹 Buscar al usuario en `auth.users` por email
-                const { data: userAuth, error: userAuthError } = yield SupabaseClient_1.supabaseAdmin
-                    .from("auth.users")
-                    .select("id, email")
-                    .eq("email", data.email)
-                    .single();
-                if (userAuthError || !userAuth) {
-                    throw new Error("Usuario no encontrado en Supabase Auth");
-                }
-                const userId = userAuth.id;
-                // Eliminar todas las sesiones previas del usuario
-                yield SupabaseClient_1.supabaseAdmin.from('auth.sessions').delete().eq('user_id', userId);
                 // Iniciar sesión con Supabase
                 const { data: authData, error } = yield SupabaseClient_1.supabaseAdmin.auth.signInWithPassword({
                     email: data.email,
@@ -85,50 +54,38 @@ class AuthService {
                 if (error) {
                     throw new Error(error.message);
                 }
-                // Obtener el usuario autenticado
-                const user = authData.user;
-                if (!user) {
-                    throw new Error("Usuario no encontrado");
-                }
                 // Obtener el token de sesión
                 const token = (_a = authData.session) === null || _a === void 0 ? void 0 : _a.access_token;
                 if (!token) {
-                    throw new Error("No se pudo generar el token");
+                    throw new Error("Error de Integracion: Error generar token");
                 }
-                // Obtener información adicional del usuario desde la tabla `users`
-                const userTable = yield this.userRepository
-                    .findByEmail(user.email)
-                    .then((user) => {
-                    console.log("🟢 Usuario obtenido:", user);
-                    return user;
-                })
-                    .catch((error) => {
-                    console.error("❌ Error en findByEmail:", error);
-                    return null;
-                });
-                if (!userTable) {
-                    throw new Error("Error al obtener información del usuario");
+                // Cerrar sesiónes anteriores a la actual del usuario autenticado
+                yield SupabaseClient_1.supabaseAdmin.auth.signOut({ scope: "others" });
+                // 🔹 Buscar al usuario en `users` por email para traer datos complementarios
+                const complementaryDataUser = yield this.userController.getUserByEmail(authData.user.email);
+                if (!complementaryDataUser) {
+                    throw new Error("Usuario no encontrado en users.auth");
                 }
                 // Devolver el token y la información del usuario
                 return {
                     token,
                     user: {
-                        id: userTable.id,
-                        uuid_authSupa: user.id,
-                        document: userTable.document,
-                        email: user.email || "",
-                        name: userTable.name,
-                        lastname: userTable.lastname,
-                        role_id: userTable.role_id,
-                        phone: userTable.phone,
-                        mobile: userTable.mobile,
-                        created_at: userTable.created_at,
-                        updated_at: userTable.updated_at,
-                        roles: userTable.roles
+                        id: complementaryDataUser.id,
+                        uuid_authSupa: authData.user.id,
+                        document: complementaryDataUser.document,
+                        email: authData.user.email || "",
+                        name: complementaryDataUser.name,
+                        lastname: complementaryDataUser.lastname,
+                        role_id: complementaryDataUser.role_id,
+                        phone: complementaryDataUser.phone,
+                        mobile: complementaryDataUser.mobile,
+                        created_at: complementaryDataUser.created_at,
+                        updated_at: complementaryDataUser.updated_at,
+                        roles: complementaryDataUser.roles
                             ? {
                                 // Verifica si la relación existe antes de acceder
-                                id: userTable.roles.id,
-                                name: userTable.roles.name,
+                                id: complementaryDataUser.roles.id,
+                                name: complementaryDataUser.roles.name,
                             }
                             : null,
                     },
@@ -144,6 +101,5 @@ class AuthService {
     Global repositorys query
 */
 AuthService.userController = new UserController_1.UserController();
-AuthService.userRepository = new UserRepository_1.UserRepository();
 exports.default = AuthService;
 //# sourceMappingURL=AuthService.js.map

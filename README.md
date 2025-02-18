@@ -60,3 +60,13 @@
 
 <h6>You must tu run into another terminal the next command to autocompile changes</h6>
 <code>npx tsc --watch</code>
+
+
+## SUPABASE FUNCTIONS TOOLS
+
+<ul>
+  <li><strong>To authenticate with supa</strong>await supabaseAdmin.auth.signInWithPassword({email: data.email,password: data.password,});</li>
+  <li><strong>To close all sessions of present users</strong> await supabaseAdmin.auth.signOut({ scope: "global" })</li>
+  <li><strong>To close others sessions of present users, except last</strong> await supabaseAdmin.auth.signOut({ scope: "others" })</li>
+  <li><strong>To close sessions others users</strong>await supabaseAdmin.auth.admin.signOut(userId);</li>
+</ul>

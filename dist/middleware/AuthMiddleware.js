@@ -29,7 +29,7 @@ const authenticateJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
         // Obtener el ID del usuario autenticado
         const userId = authData.user.id;
         // Buscar el rol en la tabla `public.users`
-        const { data, error: roleError } = yield SupabaseClient_1.supabaseAdmin
+        const { data: data, error: roleError } = yield SupabaseClient_1.supabaseAdmin
             .from('users')
             .select('id, roles(id)')
             .eq('uuid_authSupa', userId)
@@ -38,8 +38,10 @@ const authenticateJWT = (req, res, next) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: 'No se pudo obtener el rol del usuario' });
             return;
         }
-        // Si `roles` es un array, obtener el primer elemento
-        const roleId = (_a = data.roles[0]) === null || _a === void 0 ? void 0 : _a.id;
+        if (!data || !data.roles || data.roles.length === 0) {
+            throw new Error("No se encontraron roles para este usuario.");
+        }
+        const roleId = (_a = data.roles) === null || _a === void 0 ? void 0 : _a.id;
         if (!roleId) {
             res.status(403).json({ message: 'El usuario no tiene un rol asignado' });
             return;

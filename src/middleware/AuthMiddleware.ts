@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin } from "../config/SupabaseClient";
-
+import { APPUser } from "../models/UserModel";
 export interface AuthRequest extends Request {
   user?: { id: string; role_id: string };
 }
@@ -27,7 +27,7 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
     const userId = authData.user.id;
 
     // Buscar el rol en la tabla `public.users`
-    const { data, error: roleError } = await supabaseAdmin
+    const { data: data, error: roleError } = await supabaseAdmin
       .from('users')
       .select('id, roles(id)')
       .eq('uuid_authSupa', userId)
@@ -38,8 +38,11 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
       return;
     }
 
-    // Si `roles` es un array, obtener el primer elemento
-    const roleId =data.roles[0]?.id
+    if (!data || !data.roles || data.roles.length === 0) {
+      throw new Error("No se encontraron roles para este usuario.");
+    }
+    
+    const roleId = data.roles?.id;
 
     if (!roleId) {
       res.status(403).json({ message: 'El usuario no tiene un rol asignado' });
