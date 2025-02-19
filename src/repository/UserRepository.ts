@@ -52,12 +52,12 @@ export class UserRepository {
 
       const res = await client.query(
         `
-        SELECT 
-          users.*, 
-          json_build_object(
+      SELECT 
+        users.*, 
+        json_build_object(
             'id', roles.id,
             'name', roles.name              
-          ) AS role
+          ) AS roles
         FROM users
         LEFT JOIN roles ON users.role_id = roles.id
         WHERE users.email = $1

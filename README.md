@@ -13,7 +13,7 @@
 </code>
 
 ## How config env
-
+Lupefet@232
 <code>
 <ul>
 <li>SUPABASE_URL=tu_url_de_supabase</li>

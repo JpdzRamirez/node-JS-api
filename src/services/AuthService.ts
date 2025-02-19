@@ -24,10 +24,10 @@ class AuthService {
     }
   }
 
-  static async logout(userId: string): Promise<boolean> {
+  static async logout(token: string): Promise<boolean> {
     try {
       // 🔍 Buscar las sesiones activas del usuario en `auth.sessions`      
-      const { error } = await supabaseAdmin.auth.admin.signOut(userId);
+      const { error } = await supabaseAdmin.auth.admin.signOut(token);
       if (error) {
         throw new Error(error.message);
       }
@@ -83,8 +83,7 @@ class AuthService {
           mobile: complementaryDataUser.mobile,
           created_at: complementaryDataUser.created_at,
           updated_at: complementaryDataUser.updated_at,
-          roles: complementaryDataUser.roles
-            ? {
+          roles: complementaryDataUser.roles? {
                 // Verifica si la relación existe antes de acceder
                 id: complementaryDataUser.roles.id,
                 name: complementaryDataUser.roles.name,

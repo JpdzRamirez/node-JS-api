@@ -62,12 +62,12 @@ export class AuthController {
     }
   }
   static async logout(req: AuthRequest, res: Response): Promise<void> {
-    if (!req.user || !req.user.id) {
-      res.status(401).json({ message: 'Usuario no autenticado' });
+    if (!req.authToken) {
+      res.status(401).json({ message: 'Token no autorizado' });
       return;
     }
     // Revocar sesión actual
-    const result = await AuthService.logout(req.user.id);
+    const result = await AuthService.logout(req.authToken);
     
     if (!result) {
       res.status(500).json({ message: 'Error al cerrar sesión' });

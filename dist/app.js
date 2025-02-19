@@ -13,7 +13,7 @@ app.use(express_1.default.json());
 app.use('/api', routers_1.router);
 // Middleware global de manejo de errores (debe estar después de las rutas)
 app.use(globalServerMiddleware_1.globalServerMiddleware);
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });

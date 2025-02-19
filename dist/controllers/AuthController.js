@@ -61,12 +61,12 @@ class AuthController {
     }
     static logout(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
-            if (!req.user || !req.user.id) {
-                res.status(401).json({ message: 'Usuario no autenticado' });
+            if (!req.authToken) {
+                res.status(401).json({ message: 'Token no autorizado' });
                 return;
             }
             // Revocar sesión actual
-            const result = yield AuthService_1.default.logout(req.user.id);
+            const result = yield AuthService_1.default.logout(req.authToken);
             if (!result) {
                 res.status(500).json({ message: 'Error al cerrar sesión' });
                 return;

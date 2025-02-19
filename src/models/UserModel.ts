@@ -1,4 +1,4 @@
-interface APPUser {
+interface APPUser  {
   id: string;
   uuid_authSupa:string,
   document?:string;

@@ -26,11 +26,11 @@ class AuthService {
             }
         });
     }
-    static logout(userId) {
+    static logout(token) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
                 // 🔍 Buscar las sesiones activas del usuario en `auth.sessions`      
-                const { error } = yield SupabaseClient_1.supabaseAdmin.auth.admin.signOut(userId);
+                const { error } = yield SupabaseClient_1.supabaseAdmin.auth.admin.signOut(token);
                 if (error) {
                     throw new Error(error.message);
                 }
@@ -81,12 +81,11 @@ class AuthService {
                         mobile: complementaryDataUser.mobile,
                         created_at: complementaryDataUser.created_at,
                         updated_at: complementaryDataUser.updated_at,
-                        roles: complementaryDataUser.roles
-                            ? {
-                                // Verifica si la relación existe antes de acceder
-                                id: complementaryDataUser.roles.id,
-                                name: complementaryDataUser.roles.name,
-                            }
+                        roles: complementaryDataUser.roles ? {
+                            // Verifica si la relación existe antes de acceder
+                            id: complementaryDataUser.roles.id,
+                            name: complementaryDataUser.roles.name,
+                        }
                             : null,
                     },
                 };
