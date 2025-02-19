@@ -1,6 +1,6 @@
 interface APPUser  {
-  id: string;
-  uuid_authSupa:string,
+  id: number;
+  uuid_authsupa:string,
   document?:string;
   email?: string;
   password?: string; 

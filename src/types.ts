@@ -1,3 +1,5 @@
+import { Request } from 'express';
+import { APPUser } from './models/UserModel';
 interface LoginData {
   email: string;
   password: string;
@@ -14,4 +16,9 @@ interface RegisterData {
   role_id?: number;
 }
 
-export {LoginData, RegisterData };
+interface AuthRequest extends Request {
+  user?: APPUser;
+  authToken?: string;
+}
+
+export {LoginData, RegisterData,AuthRequest };

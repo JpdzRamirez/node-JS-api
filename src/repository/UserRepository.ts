@@ -5,10 +5,11 @@ import { APPUser } from "../models/UserModel";
 import bcrypt from "bcryptjs";
 
 export class UserRepository {
-  /**
+  
+  /** ✅
    * Obtiene un usuario por su ID
    */
-  async getUserById(id: string): Promise<APPUser | null> {
+  async getUserById(id: Number): Promise<APPUser | null> {
     const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
       await client.query("BEGIN"); // 🔹 Iniciar transacción
@@ -20,7 +21,7 @@ export class UserRepository {
           json_build_object(
             'id', roles.id,
             'name', roles.name              
-          ) AS role
+          ) AS roles
         FROM users
         LEFT JOIN roles ON users.role_id = roles.id
         WHERE users.id = $1
@@ -29,12 +30,11 @@ export class UserRepository {
         [id]
       );
 
-      if (res.rows.length === 0) {
-        throw new Error("No se encontró usuario.");
-      }
+      // 🔹 Confirmar transacción
+      await client.query("COMMIT"); 
 
-      await client.query("COMMIT"); // 🔹 Confirmar transacción
-      return res.rows[0];
+      return res.rows.length > 0 ? res.rows[0] : null;
+
     } catch (error) {
       await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
       console.error("❌ Error en la transacción:", error);
@@ -44,13 +44,15 @@ export class UserRepository {
     }
   }
 
-  /*Get by Email*/
+  /*✅
+  Get by Email
+  */
   async findByEmail(email: string): Promise<APPUser | null> {
     const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
       await client.query("BEGIN"); // 🔹 Iniciar transacción
 
-      const res = await client.query(
+      const result = await client.query(
         `
       SELECT 
         users.*, 
@@ -66,12 +68,10 @@ export class UserRepository {
         [email]
       );
 
-      if (res.rows.length === 0) {
-        throw new Error("No se encontró usuario.");
-      }
-
       await client.query("COMMIT"); // 🔹 Confirmar transacción
-      return res.rows[0];
+
+      return result.rows.length > 0 ? result.rows[0] : null;
+
     } catch (error) {
       await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
       console.error("❌ Error en la transacción:", error);
@@ -81,7 +81,7 @@ export class UserRepository {
     }
   }
 
-  /**
+  /**✅
    * Obtiene todos los usuarios
    */
   async getAllUsers(): Promise<APPUser[]> {
@@ -89,27 +89,23 @@ export class UserRepository {
     try {
       await client.query("BEGIN"); // 🔹 Iniciar transacción
 
-      const res = await client.query(
+      const result = await client.query(
         `
         SELECT 
         users.*, 
         json_build_object(
             'id', roles.id,
             'name', roles.name              
-        ) AS role
+        ) AS roles
         FROM users
-        LEFT JOIN roles ON users.role_id = roles.id
-        LIMIT 1;
+        LEFT JOIN roles ON users.role_id = roles.id;
       `
       );
 
-      if (res.rows.length === 0) {
-        throw new Error("No se encontró usuario.");
-      }
-
       await client.query("COMMIT"); // 🔹 Confirmar transacción
 
-      return res.rows[0];
+      return result.rows;
+
     } catch (error) {
       await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
       console.error("❌ Error en la transacción:", error);
@@ -119,18 +115,18 @@ export class UserRepository {
     }
   }
 
-  /**
+  /**✅
    * Crea un nuevo usuario
    */
   async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
-    const client = await postgreSQLPOOL.connect(); // 🔹 Conexión al pool de PostgreSQL
-    let authUserId: string | null = null; // ✅ Definir authUserId fuera del try
+    const client = await postgreSQLPOOL.connect(); 
+    let authUserId: string | null = null; 
 
     try {
       await client.query("BEGIN"); // 🔹 Iniciar transacción en `public.users`
 
       // 🔹 Crear usuario en Supabase Auth
-      const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      const { data: data, error: error } = await supabaseAdmin.auth.admin.createUser({
         phone: user.mobile ?? "",
         email: user.email ?? "",
         password: user.password as string,
@@ -143,6 +139,7 @@ export class UserRepository {
           role_id: user.role_id ?? 0,
           phone: user.mobile ?? "",
           mobile: user.mobile ?? "",
+          address:user.address?? "",
         },
       });
 
@@ -153,16 +150,12 @@ export class UserRepository {
           }`
         );
       }
-
-      authUserId = data.user.id;
-
-      // 🔹 Hashear la contraseña antes de guardar en `public.users`
-      user.password = user.password ? await bcrypt.hash(user.password, 10) : "";
+      authUserId=data.user.id;      
 
       // 🔹 Insertar usuario en `public.users`
       const insertQuery = `
-        INSERT INTO public.users (id_authtoken, document, email, name, lastname, role_id, phone, mobile, address, password)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        INSERT INTO users (uuid_authsupa, document, email, name, lastname, role_id, phone, mobile, address)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *;
       `;
 
@@ -175,8 +168,7 @@ export class UserRepository {
         user.role_id ?? 2,
         user.phone ?? "",
         user.mobile ?? "",
-        user.address ?? "",
-        user.password ?? "",
+        user.address ?? "",        
       ];
 
       const result = await client.query(insertQuery, values);
@@ -186,7 +178,9 @@ export class UserRepository {
       }
 
       await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
-      return result.rows[0];
+      
+      return result.rows.length > 0 ? result.rows[0] : null;
+
     } catch (error) {
       await client.query("ROLLBACK"); // 🔹 Revertir cambios en `public.users`
 
@@ -204,11 +198,11 @@ export class UserRepository {
     }
   }
 
-  /**
+  /**✅
    * Actualiza un usuario por su ID
    */
   async updateUser(
-    id: string,
+    id: Number,
     user: Partial<APPUser>
   ): Promise<APPUser | null> {
     const client = await postgreSQLPOOL.connect();
@@ -237,23 +231,24 @@ export class UserRepository {
 
       // 🔹 2. Actualizar `auth.users` en Supabase
       const authUpdates = {
-        email: user.email,
-        password: user.password,
-        phone: user.mobile,
-        user_metadata: {
-          display_name: `${user.name ?? ""} ${user.lastname ?? ""}`,
-          document: user.document,
-          name: user.name,
-          lastname: user.lastname,
-          role_id: user.role_id,
-          phone: user.mobile,
-          mobile: user.mobile,
+        email: updatedUser.email,
+        password: updatedUser.password,
+        phone: updatedUser.phone,
+        updatedUser_metadata: {
+          display_name: `${updatedUser.name ?? ""} ${updatedUser.lastname ?? ""}`,
+          document: updatedUser.document,
+          name: updatedUser.name,
+          lastname: updatedUser.lastname,
+          role_id: updatedUser.role_id,
+          phone: updatedUser.phone,
+          mobile: updatedUser.mobile,
+          address: updatedUser.address,
         },
       };
 
       const { error: authError } =
         await supabaseAdmin.auth.admin.updateUserById(
-          updatedUser.uuid_authSupa,
+          updatedUser.uuid_authsupa,
           authUpdates
         );
 
@@ -263,56 +258,61 @@ export class UserRepository {
         );
       }
 
-      await client.query("COMMIT"); // Confirmar la transacción
+      // 🔹 Confirmar la transacción
+      await client.query("COMMIT"); 
+
       return updatedUser; // Retornar el usuario actualizado
+
     } catch (error) {
       await client.query("ROLLBACK"); // Revertir la transacción en caso de error
       console.error("Error al actualizar usuario:", error);
-      return null;
+      throw error;
     } finally {
       client.release(); // Liberar el cliente de la pool
     }
   }
 
-  /**
+  /**✅
    * Elimina un usuario por su ID
    */
-  async deleteUser(id: string): Promise<boolean> {
+  async deleteUser(id: Number): Promise<boolean> {
     const client = await postgreSQLPOOL.connect(); // 🔹 Conectar al pool de PostgreSQL
     try {
       await client.query("BEGIN"); // 🔹 Iniciar transacción
 
       // 🔹 Obtener el ID de auth antes de eliminar el usuario en public.users
-      const { rows } = await client.query(
-        "SELECT id_authtoken FROM public.users WHERE id = $1",
+      const  result  = await client.query(
+        `SELECT id, uuid_authsupa FROM public.users WHERE id = $1`,
         [id]
       );
 
-      if (rows.length === 0) {
-        throw new Error("Usuario no encontrado en base de datos");
-      }
-
-      const authUserId = rows[0].uuid_authSupa;
-
-      // 🔹 Eliminar usuario de public.users
-      const deleteQuery = "DELETE FROM public.users WHERE id = $1";
-      await client.query(deleteQuery, [id]);
-
-      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
-
-      // 🔹 Intentar eliminar el usuario de auth.users
-      const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
-
-      if (error) {
-        console.error("⚠ Error eliminando en auth.users:", error.message);
+      if (result.rows.length === 0) {
         return false;
       }
 
+      const authUserId = result.rows[0].uuid_authsupa;
+
+      // 🔹 Eliminar usuario de public.users
+      const deleteQuery = `DELETE FROM users WHERE id = $1`;
+
+      await client.query(deleteQuery, [id]);      
+
+      // 🔹 Intentar eliminar el usuario de auth.users
+      const { error: error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+
+      if (error) {
+        throw new Error(`Error al eliminar usuario en auth.users: ${error.message}`);
+      }
+
+      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
+
       return true;
+
     } catch (error) {
-      await client.query("ROLLBACK"); // 🔹 Revertir transacción si falla
+      // 🔹 Revertir transacción si falla
+      await client.query("ROLLBACK"); 
       console.error("❌ Error eliminando usuario:", error);
-      return false;
+      throw error;
     } finally {
       client.release(); // 🔹 Liberar conexión
     }

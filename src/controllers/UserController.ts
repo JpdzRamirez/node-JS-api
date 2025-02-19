@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { APPUser } from "../models/UserModel";
-import { AuthRequest } from "../middleware/AuthMiddleware";
+import { AuthRequest } from "../types";
 import { UserRepository } from "../repository/UserRepository";
 
 export class UserController {
@@ -12,15 +12,25 @@ export class UserController {
   constructor() {
     this.userRepository = new UserRepository();
   }
+
+
   /**
    * Obtener el perfil del usuario autenticado por el id
   */
- 
-  async getProfile(req: Request, res: Response):Promise<void> {
+  async getProfile(req: AuthRequest, res: Response):Promise<void> {
     try {
-      const { id } = req.params;
+      const  id  = Number (req.params.id);
 
       const user = await this.userRepository.getUserById(id);
+      
+      if (!user) {
+        res.status(404).json({ message: "Usuario no encontrado" });
+        return;
+      }
+      if (req.user?.role_id !== 1 && req.user?.id !== id) {
+        res.status(401).json({ message: "Usuario no autorizado" });
+        return;
+      }
 
       if (!user) {        
         res.status(404).json({ message: "Usuario no encontrado" });
@@ -33,7 +43,7 @@ export class UserController {
       res.status(500).json({ message: "Error interno del servidor" });      
     }
   }
-  /**
+  /**✅
    * Obtener el perfil del usuario autenticado por el email
    */
   async getUserByEmail(email: string):Promise<APPUser | null> {
@@ -41,17 +51,14 @@ export class UserController {
       
       const user = await this.userRepository.findByEmail(email);
 
-      if (!user) {
-        throw new Error("El email no se encuentra registrado");
-      }
       return user;
       
     } catch (error:any) {      
-      return null;
+      throw error;
     }
   }
 
-  /**
+  /**✅
    * Obtener todos los usuarios (solo para administradores)
    */
   async getAllUsers(req: AuthRequest, res: Response): Promise<void> {
@@ -59,13 +66,16 @@ export class UserController {
       // Obtener todos los usuarios
       const users = await this.userRepository.getAllUsers();
       // Respuesta exitosa
+      if (!users|| users.length === 0) {
+        res.status(404).json("No se encontraron usuarios");        
+      }
       res.status(201).json(users);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   }
 
-  /**
+  /**✅
    * Crear un nuevo usuario (solo administradores)
    */
   async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
@@ -85,14 +95,13 @@ export class UserController {
     }
   }
 
-  /**
+  /**✅
    * Actualizar un usuario (admin y el propio usuario)
   */
   async updateUser(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = Number(req.params.id);
       // Definir los campos permitidos para evitar actualizaciones no deseadas
-
       const allowedFields = ["email","document" ,"role", "password","address","mobile","phone"];
       const filteredBody = Object.fromEntries(
         Object.entries(req.body).filter(([key]) => allowedFields.includes(key))
@@ -118,24 +127,22 @@ export class UserController {
     }
   }
 
-  /**
+  /**✅
    * Eliminar un usuario (solo administradores)
   */
   async deleteUser(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = Number(req.params.id);
 
       // Actualizar el usuario con los valores filtrados
-      const userDeleted = await this.userRepository.deleteUser(id as string);
+      const userDeleted = await this.userRepository.deleteUser(id);
 
       if (!userDeleted) {
-        res.status(500).json({ message: "Error al crear el usuario" });
+        res.status(400).json({ message: "No se realizaron acciones: Usuario no encontrado" });
         return;
       }
 
-      res
-        .status(201)
-        .json({ message: "Usuario eliminado", check: userDeleted });
+      res.status(201).json({ message: `Usuario ${id} eliminado`, check: userDeleted });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

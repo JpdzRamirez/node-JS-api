@@ -2,9 +2,9 @@ import { Request, Response } from "express";
 import AuthService from "../services/AuthService";
 import { LoginData } from "../types";
 import { APPUser } from "../models/UserModel";
-import { AuthRequest } from '../middleware/AuthMiddleware';
 
 export class AuthController {
+  //✅
   static async register(req: Request, res: Response) {
     try {
       const allowedFields = [
@@ -29,7 +29,7 @@ export class AuthController {
       res.status(400).json({ error: (error as Error).message });
     }
   }
-
+  //✅
   static async login(req: Request, res: Response): Promise<void> {
     try {
       const allowedFields = ["email", "password"];
@@ -61,13 +61,18 @@ export class AuthController {
       res.status(401).json({ error: (error as Error).message });
     }
   }
-  static async logout(req: AuthRequest, res: Response): Promise<void> {
-    if (!req.authToken) {
-      res.status(401).json({ message: 'Token no autorizado' });
+  //✅
+  static async logout(req: Request, res: Response): Promise<void> {
+
+    const authHeader = req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ message: 'Acceso denegado. Token no proporcionado.' });
       return;
     }
+    const token = authHeader.split(' ')[1];
+
     // Revocar sesión actual
-    const result = await AuthService.logout(req.authToken);
+    const result = await AuthService.logout(token);
     
     if (!result) {
       res.status(500).json({ message: 'Error al cerrar sesión' });

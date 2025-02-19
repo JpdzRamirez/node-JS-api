@@ -15,12 +15,12 @@ class AuthService {
       const user = await this.userController.createUser(data);
 
       if (!user) {
-        throw new Error("No se pudo crear el usuario");
+        return null;
       }
 
       return user;
     } catch (error: any) {
-      throw new Error(error.message);
+      throw error;
     }
   }
 
@@ -73,7 +73,7 @@ class AuthService {
         token,
         user: {
           id: complementaryDataUser.id,
-          uuid_authSupa: authData.user.id,
+          uuid_authsupa: authData.user.id,
           document: complementaryDataUser.document,
           email: authData.user.email || "",
           name: complementaryDataUser.name,

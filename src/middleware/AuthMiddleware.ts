@@ -1,14 +1,15 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { supabaseAdmin } from "../config/SupabaseClient";
-import { APPUser } from '../models/UserModel'; // Ajusta la ruta si es necesario
+import { UserController } from "../controllers/UserController";
+import { AuthRequest } from "../types";
+import { APPUser } from "../models/UserModel";
 
 // Extender `AuthRequest` para incluir el usuario completo
-export interface AuthRequest extends Request {
-  user?: APPUser;
-  authToken?: string;
-}
 
+const userController = new UserController();
+// ✅
 export const authenticateJWT = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    
   try {
     const authHeader = req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -21,49 +22,40 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
     // Verificar token con Supabase
     const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
 
-    if (authError || !authData.user) {
-      res.status(401).json({ message: 'Usuario no autenticado o token inválido' });
-      return;
-    }
-
-    // Obtener el ID del usuario autenticado
-    const userId = authData.user.id;
+    if (authError || !authData.user || !authData.user.email) {
+      throw new Error("Usuario no autenticado o token inválido");
+    }        
 
     // Buscar el rol en la tabla `public.users`
-    const { data, error } = await supabaseAdmin
-    .from('users')
-    .select('*, roles:roles!users_role_id_fkey(id, name)') // Usamos el alias correcto
-    .eq('uuid_authSupa', userId)
-    .single();
+    const complementaryDataUser = await userController.getUserByEmail(authData.user.email);
   
-  
-
-      if (error) {
-        throw new Error("No se encontraron roles para este usuario.");
-      }
+    if (!complementaryDataUser) {
+        throw new Error("No se encontraro usuario autenticado, llamar tecnología.");
+    }
       
     // Mapear los datos a la interfaz `APPUser`
     const user: APPUser = {
-      id: data.id,
-      uuid_authSupa: data.uuid_authSupa,
-      document: data.document,
-      email: data.email,
-      name: data.name,
-      lastname: data.lastname,
-      role_id: data.role_id,
-      phone: data.phone,
-      mobile: data.mobile,
-      address: data.address,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-      roles: data.roles ? { id: data.roles.id, name: data.roles.name } : null,
+      id: complementaryDataUser.id,
+      uuid_authsupa: complementaryDataUser.uuid_authsupa,
+      document: complementaryDataUser.document,
+      email: complementaryDataUser.email,
+      name: complementaryDataUser.name,
+      lastname: complementaryDataUser.lastname,
+      role_id: complementaryDataUser.role_id,
+      phone: complementaryDataUser.phone,
+      mobile: complementaryDataUser.mobile,
+      address: complementaryDataUser.address,
+      created_at: complementaryDataUser.created_at,
+      updated_at: complementaryDataUser.updated_at,
+      roles: complementaryDataUser.roles ? { id: complementaryDataUser.roles.id, name: complementaryDataUser.roles.name } : null,
     };
     // Guardar el usuario autenticado en `req.user`
     req.user = user;
+
     next();
-  } catch (error) {
+  } catch (error:any) {
     console.error('Error en la autenticación:', error);
-    res.status(401).json({ message: error });
+    res.status(401).json({ error: error.message });
   }
 };
 

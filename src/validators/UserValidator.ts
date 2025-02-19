@@ -6,6 +6,7 @@ import { body, param } from "express-validator";
 export const validateCreateUser = [
   body("email")
     .trim()
+    .notEmpty()
     .isEmail()
     .withMessage("El email no es válido")
     .custom((value) => {
@@ -17,6 +18,7 @@ export const validateCreateUser = [
 
   body("password")
     .trim()
+    .notEmpty()
     .isLength({ min: 6 })
     .withMessage("La contraseña debe tener al menos 6 caracteres")
     .matches(/[A-Z]/)
@@ -33,16 +35,19 @@ export const validateCreateUser = [
       }
       return true;
     }),
+
   body("name")
     .isString()
     .notEmpty()
     .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
     .withMessage("El nombre es obligatorio"),
+
   body("lastname")
     .optional()
     .isString()
     .matches(/^[A-Za-zÁÉÍÓÚáéíóúÑñ\s]+$/)
     .withMessage("El apellido solo debe contener letras y espacios"),
+
   body("document")
     .isNumeric()
     .withMessage("El documento debe ser un número")
@@ -54,11 +59,20 @@ export const validateCreateUser = [
     })
     .notEmpty()
     .withMessage("El documento no puede estar vacío"),
+
   body("phone")
     .optional()
     .isString()
     .withMessage("El teléfono debe ser una cadena de texto"),
+
+  body("address")
+    .optional()
+    .isString()
+    .withMessage("La dirección debe ser una cadena de texto"),
+
+
   body("mobile").isString().notEmpty().withMessage("El móvil es obligatorio"),
+
   body("role_id")
     .optional()
     .isInt({ min: 1 })
@@ -69,6 +83,7 @@ export const validateCreateUser = [
 
 // ✅ Validación para actualizar usuario
 export const validateUpdateUser = [
+  param("id").isUUID().withMessage("El ID es requerido"),
   // ✅ Validar email si se envía (sin espacios, formato correcto)
   body("email")
     .optional()
@@ -142,7 +157,7 @@ export const validateUpdateUser = [
 
 // ✅ Validación para obtener usuario por ID
 export const validateGetUser = [
-  param("id").isUUID().withMessage("El ID no existe en los registros"),
+  param("id").isUUID().withMessage("El ID es requerido"),
 ];
 
 // ✅ Validación para obtener usuario por emails
@@ -162,5 +177,5 @@ export const validateGetUserByEmail = [
 
 // ✅ Validación para eliminar usuario
 export const validateDeleteUser = [
-  param("id").isUUID().withMessage("El ID debe no coincide en los registros"),
+  param("id").isUUID().withMessage("El ID es requerido"),
 ];

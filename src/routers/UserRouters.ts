@@ -1,4 +1,4 @@
-import { Router,Request, Response } from 'express';
+import { Router } from 'express';
 
 import { UserController } from '../controllers/UserController';
 import { AuthController } from '../controllers/AuthController';
@@ -22,18 +22,18 @@ const router = Router();
 const userController = new UserController();
 
 // Middleware común para todas las rutas de usuarios
-router.use('/users', authenticateJWT,handleValidationErrors,);
-
+router.use('/', authenticateJWT,handleValidationErrors,);
 
 /*
   Agrupación de rutas admin
 */
 // Subgrupo para rutas de administrador (admin)
-router.use('/users/admin', roleMiddleware(['admin']));
-router.get('/users/admin/get-users', userController.getAllUsers.bind(userController));
-router.post('/users/admin/create-user', validateCreateUser, AuthController.register.bind(AuthController));
-router.delete('/users/admin/get-profile/:id', validateGetUser, userController.getProfile.bind(userController));
-router.delete('/users/admin/delete-user/:id', validateDeleteUser,userController.deleteUser.bind(userController));
+router.use('/admin', roleMiddleware([1]));
+router.get('/admin/get-users', userController.getAllUsers.bind(userController));
+router.post('/admin/create-user', validateCreateUser, AuthController.register.bind(AuthController));
+router.get('/admin/get-profile/:id', validateGetUser, userController.getProfile.bind(userController));
+router.patch('/admin/update-user/:id', validateUpdateUser,userController.updateUser.bind(userController));
+router.delete('/admin/delete-user/:id', validateDeleteUser,userController.deleteUser.bind(userController));
 
 //****************************************************************** */
 
@@ -41,8 +41,8 @@ router.delete('/users/admin/delete-user/:id', validateDeleteUser,userController.
   Agrupación rutas user
 */
 // Subgrupo para rutas de usuario (user)
-router.use('/users/profile', roleMiddleware(['user']));
-router.get('/users/profile/get-profile/:id', validateGetUser, userController.getProfile.bind(userController));
+router.use('/profile', roleMiddleware([2]));
+router.get('/profile/my-profile/:id', validateGetUser, userController.getProfile.bind(userController));
 
 //****************************************************************** */
 
@@ -50,7 +50,7 @@ router.get('/users/profile/get-profile/:id', validateGetUser, userController.get
   Agrupación rutas compartidas
 */
 // Rutas compartidas (admin y user)
-router.put('/users/:id', validateUpdateUser, roleMiddleware(['admin', 'user']), userController.updateUser.bind(userController));
+router.put('/update-user/:id', validateUpdateUser, roleMiddleware([1, 2]), userController.updateUser.bind(userController));
 
 //****************************************************************** */
 
