@@ -43,14 +43,14 @@ router.delete('/admin/delete-user/:id', validateDeleteUser,userController.delete
 // Subgrupo para rutas de usuario (user)
 router.use('/profile', roleMiddleware([2]));
 router.get('/profile/my-profile/:id', validateGetUser, userController.getProfile.bind(userController));
-
+router.patch('/profile/update-my-profile/:id', validateUpdateUser, roleMiddleware([2]), userController.updateUser.bind(userController));
 //****************************************************************** */
 
 /*
   Agrupación rutas compartidas
 */
 // Rutas compartidas (admin y user)
-router.put('/update-user/:id', validateUpdateUser, roleMiddleware([1, 2]), userController.updateUser.bind(userController));
+
 
 //****************************************************************** */
 

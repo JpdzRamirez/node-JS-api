@@ -21,18 +21,22 @@ export class UserController {
     try {
       const  id  = Number (req.params.id);
 
-      const user = await this.userRepository.getUserById(id);
-      
-      if (!user) {
-        res.status(404).json({ message: "Usuario no encontrado" });
+      if (isNaN(id)) {
+        res.status(400).json({ message: "ID inválido" });
         return;
       }
-      if (req.user?.role_id !== 1 && req.user?.id !== id) {
-        res.status(401).json({ message: "Usuario no autorizado" });
+    
+      const roleId = Number(req.user?.role_id);
+      const userId = Number(req.user?.id);
+    
+      if (roleId !== 1 && userId !== id) {
+        res.status(403).json({ message: "Usuario no autorizado" });
         return;
       }
 
-      if (!user) {        
+      const user = await this.userRepository.getUserById(id);
+
+      if (!user) {
         res.status(404).json({ message: "Usuario no encontrado" });
         return;
       }
@@ -51,6 +55,9 @@ export class UserController {
       
       const user = await this.userRepository.findByEmail(email);
 
+      if (!user) {        
+        return null;
+      }
       return user;
       
     } catch (error:any) {      
@@ -101,6 +108,19 @@ export class UserController {
   async updateUser(req: AuthRequest, res: Response): Promise<void> {
     try {
       const id = Number(req.params.id);
+
+      if (isNaN(id)) {
+        res.status(400).json({ message: "ID inválido" });
+        return;
+      }
+    
+      const roleId = Number(req.user?.role_id);
+      const userId = Number(req.user?.id);
+    
+      if (roleId !== 1 && userId !== id) {
+        res.status(403).json({ message: "Usuario no autorizado" });
+        return;
+      }
       // Definir los campos permitidos para evitar actualizaciones no deseadas
       const allowedFields = ["email","document" ,"role", "password","address","mobile","phone"];
       const filteredBody = Object.fromEntries(
@@ -138,7 +158,7 @@ export class UserController {
       const userDeleted = await this.userRepository.deleteUser(id);
 
       if (!userDeleted) {
-        res.status(400).json({ message: "No se realizaron acciones: Usuario no encontrado" });
+        res.status(400).json({ message: "Error de integración: No se realizaron acciones" });
         return;
       }
 

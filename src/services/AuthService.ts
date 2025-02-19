@@ -12,13 +12,7 @@ class AuthService {
 
   static async userBuilder(data: Partial<APPUser>): Promise<any> {
     try {
-      const user = await this.userController.createUser(data);
-
-      if (!user) {
-        return null;
-      }
-
-      return user;
+      return await this.userController.createUser(data);
     } catch (error: any) {
       throw error;
     }
@@ -65,7 +59,7 @@ class AuthService {
       );
 
       if (!complementaryDataUser) {
-        throw new Error("Usuario no encontrado en users.auth");
+        return null;
       }
 
       // Devolver el token y la información del usuario

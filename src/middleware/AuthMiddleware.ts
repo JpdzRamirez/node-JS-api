@@ -30,7 +30,8 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
     const complementaryDataUser = await userController.getUserByEmail(authData.user.email);
   
     if (!complementaryDataUser) {
-        throw new Error("No se encontraro usuario autenticado, llamar tecnología.");
+      res.status(404).json({ message: "No se encontraro usuario autenticado" });
+      return;        
     }
       
     // Mapear los datos a la interfaz `APPUser`
@@ -56,6 +57,7 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
   } catch (error:any) {
     console.error('Error en la autenticación:', error);
     res.status(401).json({ error: error.message });
+    return;    
   }
 };
 

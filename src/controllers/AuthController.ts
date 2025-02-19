@@ -20,13 +20,13 @@ export class AuthController {
       const user = await AuthService.userBuilder(filteredBody);
 
       if (!user) {
-        res.status(400).json({ error: "No se pudo crear el usuario" });
+        res.status(404).json({ error: "No se pudo crear el usuario" });
       }
 
       res.status(201).json({ message: "Usuario registrado con éxito", user });
 
     } catch (error:any) {
-      res.status(400).json({ error: (error as Error).message });
+      res.status(500).json({ error: (error as Error).message });
     }
   }
   //✅
@@ -45,7 +45,8 @@ export class AuthController {
       );
 
       if (!isLoginData(filteredBody)) {
-        throw new Error("Error en datos suministrados");
+        res.status(404).json({ error: "Credenciales inválidas" });
+        return;
       }
 
       const result = await AuthService.login(filteredBody);
@@ -58,7 +59,7 @@ export class AuthController {
       const { token, user } = result;
       res.json({ message: "Login exitoso", token, user });
     } catch (error:any) {
-      res.status(401).json({ error: (error as Error).message });
+      res.status(500).json({ error: (error as Error).message });
     }
   }
   //✅

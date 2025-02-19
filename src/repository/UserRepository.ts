@@ -295,7 +295,11 @@ export class UserRepository {
       // 🔹 Eliminar usuario de public.users
       const deleteQuery = `DELETE FROM users WHERE id = $1`;
 
-      await client.query(deleteQuery, [id]);      
+      const resultDelete = await client.query(deleteQuery, [id]);      
+
+      if (resultDelete.rowCount === 0) {
+        return false; 
+      }
 
       // 🔹 Intentar eliminar el usuario de auth.users
       const { error: error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
