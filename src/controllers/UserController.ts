@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { APPUser } from "../models/UserModel";
+import { APPUser } from "../models/auth/User.entity";
 import { AuthRequest } from "../types";
 import { UserRepository } from "../repository/UserRepository";
 
@@ -26,7 +26,7 @@ export class UserController {
         return;
       }
     
-      const roleId = Number(req.user?.role_id);
+      const roleId = Number(req.user?.roles?.id);
       const userId = Number(req.user?.id);
     
       if (roleId !== 1 && userId !== id) {
@@ -85,7 +85,7 @@ export class UserController {
   /**✅
    * Crear un nuevo usuario (solo administradores)
    */
-  async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
+  async createUser(user: Partial<APPUser>): Promise<any | null> {
     try {
       // Verificar si el email ya está registrado
       const existingUser = await this.userRepository.findByEmail(user.email as string);
@@ -114,7 +114,7 @@ export class UserController {
         return;
       }
     
-      const roleId = Number(req.user?.role_id);
+      const roleId = Number(req.user?.roles?.id);
       const userId = Number(req.user?.id);
     
       if (roleId !== 1 && userId !== id) {

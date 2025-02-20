@@ -1,46 +1,28 @@
 import { supabaseAnon, supabaseAdmin } from "../config/SupabaseClient";
-import postgreSQLPOOL from "../config/PostgreSQLClient";
-import { APPUser } from "../models/UserModel";
+import { postgreSQLPOOL } from "../config/PostgreSQLClient";
+import { APPUser } from "../models/auth/User.entity";
+import { Repository } from "typeorm";
 
 import bcrypt from "bcryptjs";
 
 export class UserRepository {
-  
+  private userRepository: Repository<APPUser>;
+
+  constructor() {
+    this.userRepository = postgreSQLPOOL.getRepository(APPUser);
+  }
   /** ✅
    * Obtiene un usuario por su ID
    */
-  async getUserById(id: Number): Promise<APPUser | null> {
-    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
+  async getUserById(id: number): Promise<APPUser | null> {
     try {
-      await client.query("BEGIN"); // 🔹 Iniciar transacción
-
-      const res = await client.query(
-        `
-        SELECT 
-          users.*, 
-          json_build_object(
-            'id', roles.id,
-            'name', roles.name              
-          ) AS roles
-        FROM users
-        LEFT JOIN roles ON users.role_id = roles.id
-        WHERE users.id = $1
-        LIMIT 1;
-      `,
-        [id]
-      );
-
-      // 🔹 Confirmar transacción
-      await client.query("COMMIT"); 
-
-      return res.rows.length > 0 ? res.rows[0] : null;
-
+      return await this.userRepository.findOne({
+        where: { id },
+        relations: ["roles"], // 🔹 Cargar relación con roles automáticamente
+      });
     } catch (error) {
-      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
-      console.error("❌ Error en la transacción:", error);
+      console.error("❌ Error en getUserById:", error);
       throw error;
-    } finally {
-      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
@@ -48,36 +30,16 @@ export class UserRepository {
   Get by Email
   */
   async findByEmail(email: string): Promise<APPUser | null> {
-    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
-      await client.query("BEGIN"); // 🔹 Iniciar transacción
+      const user = await this.userRepository.findOne({
+        where: { email },
+        relations: ["roles"], // 🔹 Cargar relación con roles
+      });
 
-      const result = await client.query(
-        `
-      SELECT 
-        users.*, 
-        json_build_object(
-            'id', roles.id,
-            'name', roles.name              
-          ) AS roles
-        FROM users
-        LEFT JOIN roles ON users.role_id = roles.id
-        WHERE users.email = $1
-        LIMIT 1;
-      `,
-        [email]
-      );
-
-      await client.query("COMMIT"); // 🔹 Confirmar transacción
-
-      return result.rows.length > 0 ? result.rows[0] : null;
-
+      return user || null;
     } catch (error) {
-      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
-      console.error("❌ Error en la transacción:", error);
+      console.error("❌ Error en findByEmail:", error);
       throw error;
-    } finally {
-      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
@@ -85,48 +47,30 @@ export class UserRepository {
    * Obtiene todos los usuarios
    */
   async getAllUsers(): Promise<APPUser[]> {
-    const client = await postgreSQLPOOL.connect(); // 🟢 Obtener conexión del pool
     try {
-      await client.query("BEGIN"); // 🔹 Iniciar transacción
-
-      const result = await client.query(
-        `
-        SELECT 
-        users.*, 
-        json_build_object(
-            'id', roles.id,
-            'name', roles.name              
-        ) AS roles
-        FROM users
-        LEFT JOIN roles ON users.role_id = roles.id;
-      `
-      );
-
-      await client.query("COMMIT"); // 🔹 Confirmar transacción
-
-      return result.rows;
-
+      return await this.userRepository.find({
+        relations: ["roles"], // 🔹 Cargar relación con roles automáticamente
+      });
     } catch (error) {
-      await client.query("ROLLBACK"); // 🔹 Deshacer cambios en caso de error
-      console.error("❌ Error en la transacción:", error);
+      console.error("❌ Error en getAllUsers:", error);
       throw error;
-    } finally {
-      client.release(); // 🔹 Liberar conexión para otros procesos
     }
   }
 
   /**✅
    * Crea un nuevo usuario
    */
-  async createUser(user: Partial<APPUser>): Promise<APPUser | null> {
-    const client = await postgreSQLPOOL.connect(); 
-    let authUserId: string | null = null; 
+  async createUser(user: Partial<APPUser>): Promise<any> {
+
+    let authUserId: string | null = null;
+    const queryRunner = postgreSQLPOOL.createQueryRunner();
+
+    await queryRunner.connect();
+    await queryRunner.startTransaction(); // 🔹 Iniciar transacción
 
     try {
-      await client.query("BEGIN"); // 🔹 Iniciar transacción en `public.users`
-
       // 🔹 Crear usuario en Supabase Auth
-      const { data: data, error: error } = await supabaseAdmin.auth.admin.createUser({
+      const { data, error } = await supabaseAdmin.auth.admin.createUser({
         phone: user.mobile ?? "",
         email: user.email ?? "",
         password: user.password as string,
@@ -136,189 +80,184 @@ export class UserRepository {
           document: user.document ?? "",
           name: user.name ?? "",
           lastname: user.lastname ?? "",
-          role_id: user.role_id ?? 0,
+          role_id: user.roles?.id ?? 2,
           phone: user.mobile ?? "",
           mobile: user.mobile ?? "",
-          address:user.address?? "",
+          address: user.address ?? "",
         },
       });
 
-      if (error || !data?.user) {
+      if (error || !data?.user || !user.password) {
         throw new Error(
-          `Error en Supabase Auth: ${
-            error?.message || "No se pudo crear el usuario"
-          }`
+          `Error en Supabase Auth: ${error?.message || "No se pudo crear el usuario"}`
         );
       }
-      authUserId=data.user.id;      
+      authUserId = data.user.id;
 
-      // 🔹 Insertar usuario en `public.users`
-      const insertQuery = `
-        INSERT INTO users (uuid_authsupa, document, email, name, lastname, role_id, phone, mobile, address)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *;
-      `;
+      // 🔹 Especificar el esquema donde se guardará el usuario
+      const schemaName = "acueducto11"; // Puedes cambiarlo dinámicamente
 
-      const values = [
-        authUserId,
-        user.document ?? "",
-        user.email ?? "",
-        user.name ?? "",
-        user.lastname ?? "",
-        user.role_id ?? 2,
-        user.phone ?? "",
-        user.mobile ?? "",
-        user.address ?? "",        
-      ];
+      const passwordHashed = bcrypt.hashSync(user.password, 10);
 
-      const result = await client.query(insertQuery, values);
+      // 🔹 Insertar usuario en `schemaName.users`
+      const newUser = queryRunner.manager.create(APPUser, {
+          uuid_authsupa: authUserId,
+          document: user.document ?? "",
+          password: passwordHashed ?? "",
+          email: user.email ?? "",
+          name: user.name ?? "",
+          lastname: user.lastname ?? "",
+          roleId: user.roles?.id ?? 2,
+          phone: user.phone ?? "",
+          mobile: user.mobile ?? "",
+          address: user.address ?? "",
+      });
 
-      if (result.rows.length === 0) {
-        throw new Error("No se pudo crear el usuario en la base de datos.");
-      }
+      // 🔹 Guardar el usuario en el esquema especificado
+      const savedUser = await queryRunner.manager
+          .createQueryBuilder()
+          .insert()
+          .into(`${schemaName}.users`) // 🔹 Esquema dinámico
+          .values(newUser)
+          .execute();
 
-      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
-      
-      return result.rows.length > 0 ? result.rows[0] : null;
+      await queryRunner.commitTransaction(); // 🔹 Confirmar transacción
+
+      return savedUser;
 
     } catch (error) {
-      await client.query("ROLLBACK"); // 🔹 Revertir cambios en `public.users`
-
+      await queryRunner.rollbackTransaction(); // 🔹 Revertir cambios en `public.users`
       console.error("❌ Error al crear usuario:", error);
 
       if (authUserId) {
-        // 🔹 Si la transacción en `public.users` falló, eliminar usuario en `auth.users`
+        // 🔹 Si la transacción falló, eliminar usuario en `auth.users`
         console.log("🗑 Eliminando usuario en auth.users...");
         await supabaseAdmin.auth.admin.deleteUser(authUserId);
       }
 
       throw error;
     } finally {
-      client.release(); // 🔹 Liberar conexión
+      await queryRunner.release(); // 🔹 Liberar conexión
     }
   }
 
   /**✅
    * Actualiza un usuario por su ID
    */
-  async updateUser(
-    id: Number,
-    user: Partial<APPUser>
-  ): Promise<APPUser | null> {
-    const client = await postgreSQLPOOL.connect();
+  async updateUser(id: number, user: Partial<APPUser>): Promise<APPUser | null> {
 
+    const queryRunner = postgreSQLPOOL.createQueryRunner(); // Crear QueryRunner para transacción
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+  
     try {
-      await client.query("BEGIN"); // Inicia la transacción
-
-      // 🔹 1. Actualizar `public.users`
-      user.updated_at = new Date(); // Agregar la fecha de actualización
-
-      const fields = Object.keys(user)
-        .map((key, i) => `${key} = $${i + 2}`)
-        .join(", ");
-      const values = Object.values(user);
-
-      const { rows: updatedUserData } = await client.query(
-        `UPDATE users SET ${fields} WHERE id = $1 RETURNING *`,
-        [id, ...values]
-      );
-
-      if (updatedUserData.length === 0) {
-        throw new Error("No se pudo actualizar el usuario en public.users.");
+      // 🔹 1. Actualizar `public.users` en la base de datos
+      user.updated_at = new Date(); // Agregar timestamp de actualización
+      if (!user.password) {
+        throw new Error(
+          `Error de validación de campos || "No se pudo actualizar el usuario"}`
+        );
       }
 
-      const updatedUser = updatedUserData[0];
+      user.password = bcrypt.hashSync(user.password, 10);
 
+      await queryRunner.manager.update(APPUser, id, user); // Actualiza el usuario en la BD
+  
+      // 🔹 Obtener el usuario actualizado
+      const updatedUser = await queryRunner.manager.findOne(APPUser, {
+        where: { id },
+        relations: ["roles"], // Cargar relación con roles
+      });
+  
+      if (!updatedUser) {
+        throw new Error("No se pudo actualizar el usuario en public.users.");
+      }
+      
       // 🔹 2. Actualizar `auth.users` en Supabase
       const authUpdates = {
         email: updatedUser.email,
-        password: updatedUser.password,
+        password: user.password,
         phone: updatedUser.phone,
-        updatedUser_metadata: {
+        user_metadata: {
           display_name: `${updatedUser.name ?? ""} ${updatedUser.lastname ?? ""}`,
           document: updatedUser.document,
           name: updatedUser.name,
           lastname: updatedUser.lastname,
-          role_id: updatedUser.role_id,
+          role_id: updatedUser.roles?.id,
           phone: updatedUser.phone,
           mobile: updatedUser.mobile,
           address: updatedUser.address,
         },
       };
-
-      const { error: authError } =
-        await supabaseAdmin.auth.admin.updateUserById(
-          updatedUser.uuid_authsupa,
-          authUpdates
-        );
-
-      if (authError) {
-        throw new Error(
-          `Error al actualizar en auth.users: ${authError.message}`
-        );
+      
+      if(!updatedUser.uuid_authsupa){
+        throw new Error(`Error al realizar la actualización`);
       }
-
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+        updatedUser.uuid_authsupa,
+        authUpdates
+      );
+  
+      if (authError) {
+        throw new Error(`Error al actualizar en auth.users: ${authError.message}`);
+      }
+  
       // 🔹 Confirmar la transacción
-      await client.query("COMMIT"); 
-
-      return updatedUser; // Retornar el usuario actualizado
-
+      await queryRunner.commitTransaction();
+      // Retornar el usuario actualizado
+      return updatedUser; 
+  
     } catch (error) {
-      await client.query("ROLLBACK"); // Revertir la transacción en caso de error
+      //🔹 Revertir en caso de error
+      await queryRunner.rollbackTransaction(); 
       console.error("Error al actualizar usuario:", error);
       throw error;
     } finally {
-      client.release(); // Liberar el cliente de la pool
+      await queryRunner.release(); // Liberar QueryRunner
     }
   }
+  
 
   /**✅
    * Elimina un usuario por su ID
    */
-  async deleteUser(id: Number): Promise<boolean> {
-    const client = await postgreSQLPOOL.connect(); // 🔹 Conectar al pool de PostgreSQL
+  async deleteUser(id: number): Promise<boolean> {
+    const queryRunner = postgreSQLPOOL.createQueryRunner(); // Crear QueryRunner para transacción
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+  
     try {
-      await client.query("BEGIN"); // 🔹 Iniciar transacción
-
-      // 🔹 Obtener el ID de auth antes de eliminar el usuario en public.users
-      const  result  = await client.query(
-        `SELECT id, uuid_authsupa FROM public.users WHERE id = $1`,
-        [id]
-      );
-
-      if (result.rows.length === 0) {
-        return false;
+      // 🔹 1. Obtener el usuario antes de eliminarlo
+      const user = await queryRunner.manager.findOne(APPUser, { where: { id } });
+  
+      if (!user) {
+        return false; // Si no existe, no se elimina
       }
+  
+      // 🔹 2. Eliminar usuario en `public.users`
+      await queryRunner.manager.delete(APPUser, id);
 
-      const authUserId = result.rows[0].uuid_authsupa;
-
-      // 🔹 Eliminar usuario de public.users
-      const deleteQuery = `DELETE FROM users WHERE id = $1`;
-
-      const resultDelete = await client.query(deleteQuery, [id]);      
-
-      if (resultDelete.rowCount === 0) {
-        return false; 
+      if(!user.uuid_authsupa){
+        throw new Error(`Error al realizar la actualización`);
       }
-
-      // 🔹 Intentar eliminar el usuario de auth.users
-      const { error: error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
-
+      // 🔹 3. Eliminar usuario en Supabase Auth
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(user.uuid_authsupa);
+  
       if (error) {
         throw new Error(`Error al eliminar usuario en auth.users: ${error.message}`);
       }
-
-      await client.query("COMMIT"); // 🔹 Confirmar transacción en `public.users`
-
+  
+      // 🔹 4. Confirmar la transacción
+      await queryRunner.commitTransaction();
       return true;
-
+  
     } catch (error) {
-      // 🔹 Revertir transacción si falla
-      await client.query("ROLLBACK"); 
+      await queryRunner.rollbackTransaction(); // Revertir en caso de error
       console.error("❌ Error eliminando usuario:", error);
       throw error;
     } finally {
-      client.release(); // 🔹 Liberar conexión
+      await queryRunner.release(); // Liberar QueryRunner
     }
   }
+  
 }

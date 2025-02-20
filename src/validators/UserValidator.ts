@@ -49,6 +49,7 @@ export const validateCreateUser = [
     .withMessage("El apellido solo debe contener letras y espacios"),
 
   body("document")
+    .trim()
     .isNumeric()
     .withMessage("El documento debe ser un número")
     .custom((value) => {
@@ -60,8 +61,22 @@ export const validateCreateUser = [
     .notEmpty()
     .withMessage("El documento no puede estar vacío"),
 
+    body("document")
+    .trim()
+    .isNumeric()
+    .withMessage("El esquema debe ser un número")
+    .custom((value) => {
+      if (!/^\d+$/.test(value)) {
+        throw new Error("El esquema solo debe contener números");
+      }
+      return true;
+    })
+    .notEmpty()
+    .withMessage("El esquema debe ser específicado, no puede estar vacío"),
+
   body("phone")
     .optional()
+    .trim()
     .isString()
     .withMessage("El teléfono debe ser una cadena de texto"),
 
@@ -71,9 +86,10 @@ export const validateCreateUser = [
     .withMessage("La dirección debe ser una cadena de texto"),
 
 
-  body("mobile").isString().notEmpty().withMessage("El móvil es obligatorio"),
+  body("mobile").trim().isString().notEmpty().withMessage("El móvil es obligatorio"),
 
   body("role_id")
+    .trim()
     .optional()
     .isInt({ min: 1 })
     .withMessage("El rol debe ser un número entero positivo"),
@@ -135,6 +151,7 @@ export const validateUpdateUser = [
     .withMessage("El documento no puede estar vacío"),
   body("phone")
     .optional()
+    .trim()
     .matches(/^\d+$/)
     .withMessage("El telefono debe ser una cadena de texto"),
   body("mobile")
@@ -149,6 +166,7 @@ export const validateUpdateUser = [
   // ✅ Validar el rol si se envía
   body("role")
     .optional()
+    .trim()
     .isIn(["user", "admin", "guest"])
     .withMessage("Rol inválido"),
 ];
@@ -162,15 +180,15 @@ export const validateGetUser = [
 
 // ✅ Validación para obtener usuario por emails
 export const validateLoginUser = [
-  body("email").isEmail().withMessage("El email proporcionado no es válido"),
-  body("password").notEmpty().withMessage("La contraseña no fué proporcionada"),
+  body("email").isEmail().trim().withMessage("El email proporcionado no es válido"),
+  body("password").notEmpty().trim().withMessage("La contraseña no fué proporcionada"),
 ];
 
 //************************************************************************** */
 
 // ✅ Validación para obtener usuario por emails
 export const validateGetUserByEmail = [
-  body("email").isEmail().withMessage("El email proporcionado no es válido"),
+  body("email").isEmail().trim().withMessage("El email proporcionado no es válido"),
 ];
 
 //************************************************************************** */

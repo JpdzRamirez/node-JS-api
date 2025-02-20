@@ -2,7 +2,7 @@ import { Response, NextFunction } from 'express';
 import { supabaseAdmin } from "../config/SupabaseClient";
 import { UserController } from "../controllers/UserController";
 import { AuthRequest } from "../types";
-import { APPUser } from "../models/UserModel";
+import { APPUser } from "../models/auth/User.entity";
 
 // Extender `AuthRequest` para incluir el usuario completo
 
@@ -34,15 +34,16 @@ export const authenticateJWT = async (req: AuthRequest, res: Response, next: Nex
       return;        
     }
       
-    // Mapear los datos a la interfaz `APPUser`
+    // 🔹 3. Mapear los datos al modelo `APPUser`
     const user: APPUser = {
       id: complementaryDataUser.id,
       uuid_authsupa: complementaryDataUser.uuid_authsupa,
+      schema_id: complementaryDataUser.schema_id,
       document: complementaryDataUser.document,
       email: complementaryDataUser.email,
+      password: "", // 🔹 No devolver la contraseña por seguridad
       name: complementaryDataUser.name,
       lastname: complementaryDataUser.lastname,
-      role_id: complementaryDataUser.role_id,
       phone: complementaryDataUser.phone,
       mobile: complementaryDataUser.mobile,
       address: complementaryDataUser.address,

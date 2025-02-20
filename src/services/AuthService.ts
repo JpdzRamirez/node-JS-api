@@ -1,4 +1,4 @@
-import { APPUser } from "../models/UserModel";
+import { APPUser } from "../models/auth/User.entity";
 import { UserController } from "../controllers/UserController";
 import { supabaseAdmin } from "../config/SupabaseClient";
 import { LoginData } from "../types";
@@ -68,11 +68,11 @@ class AuthService {
         user: {
           id: complementaryDataUser.id,
           uuid_authsupa: authData.user.id,
+          schema_id:complementaryDataUser.schema_id,
           document: complementaryDataUser.document,
           email: authData.user.email || "",
           name: complementaryDataUser.name,
           lastname: complementaryDataUser.lastname,
-          role_id: complementaryDataUser.role_id,
           phone: complementaryDataUser.phone,
           mobile: complementaryDataUser.mobile,
           created_at: complementaryDataUser.created_at,

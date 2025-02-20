@@ -1,5 +1,5 @@
 import { Request } from 'express';
-import { APPUser } from './models/UserModel';
+import { APPUser } from './models/auth/User.entity';
 interface LoginData {
   email: string;
   password: string;

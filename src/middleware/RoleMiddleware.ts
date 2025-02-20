@@ -8,7 +8,7 @@ export const roleMiddleware = (roles: number[]) => {
       return;
     }
 
-    const roleId = req.user.role_id ?? NaN; // Si es undefined/null, asignamos NaN
+    const roleId = req.user.roles?.id ?? NaN; // Si es undefined/null, asignamos NaN
 
     if (isNaN(roleId) || !roles.includes(roleId)) {
       res.status(403).json({ message: 'Sin permisos de usuario' });

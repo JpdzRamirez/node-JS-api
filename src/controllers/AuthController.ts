@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import AuthService from "../services/AuthService";
 import { LoginData } from "../types";
-import { APPUser } from "../models/UserModel";
+import { APPUser } from "../models/auth/User.entity";
 
 export class AuthController {
   //✅
@@ -9,7 +9,7 @@ export class AuthController {
     try {
       const allowedFields = [
         "name", "lastname", "document", "phone", "mobile",
-        "email", "password", "role_id","address"
+        "email", "password", "role_id","address","schema_id"
       ];
       
       // 🔹 Filtramos solo los campos permitidos
