@@ -3,7 +3,7 @@ import express from 'express';
 import { globalServerMiddleware } from './middleware/globalServerMiddleware';
 import { router } from './routers';
 import "reflect-metadata";
-import { postgreSQLPOOL } from "./config/PostgreSQLClient"; // ✅ Importa la conexión a la BD
+import { postgreSQLPOOL } from "./config/PostgreSQLClient"; // ✅ Import client PostgreSQLPOOL BD
 
 const app = express();
 app.use(express.json());
@@ -13,17 +13,17 @@ async function connectDatabase(retries = 5, delay = 5000) {
     try {
       if (!postgreSQLPOOL.isInitialized) {
         await postgreSQLPOOL.initialize();
-        console.log("✅ Conectado a la base de datos de Supabase");
+        console.log("✅ Conected Supabase");
       }
-      return; // 🔹 Salir de la función si la conexión fue exitosa
+      return; // 🔹 Conection Succsess
     } catch (error) {
-      console.error(`❌ Error al conectar la base de datos (Intento ${i + 1}/${retries}):`, error);
+      console.error(`❌ Error connect to DB (Try ${i + 1}/${retries}):`, error);
       if (i < retries - 1) {
-        console.log(`🔄 Reintentando en ${delay / 1000} segundos...`);
+        console.log(`🔄 Try in ${delay / 1000} seg...`);
         await new Promise(res => setTimeout(res, delay));
       } else {
-        console.error("❌ No se pudo conectar a la base de datos después de varios intentos.");
-        process.exit(1); // ❗ Terminar el proceso si no se puede conectar
+        console.error("❌ Error connection.");
+        process.exit(1); // ❗ Close process to connect
       }
     }
   }

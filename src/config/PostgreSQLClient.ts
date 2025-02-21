@@ -10,15 +10,15 @@ dotenv.config();
 
 export const postgreSQLPOOL  = new DataSource({
   type: "postgres",
-  url: process.env.DATABASE_URL, // Usa la conexión de Supabase
-  synchronize: true, // ❗ Solo en desarrollo, en producción usar migrations
+  url: process.env.DATABASE_URL, // Supabase URL
+  synchronize: true, // develop
   logging: false,
   entities: [APPUser, Role], // Ruta a tus entidades
   migrations: ["src/models/migrations/**/*.ts"],
   subscribers: [],
   extra: {
-    max: 10, // Máximo de conexiones en el pool
-    idleTimeoutMillis: 30000, // Tiempo de inactividad antes de cerrar
-    connectionTimeoutMillis: 2000, // Tiempo máximo de espera para conectar
+    max: 10, // Max pool
+    idleTimeoutMillis: 30000, // Inactivity
+    connectionTimeoutMillis: 2000, // Máximo time
   },
 });

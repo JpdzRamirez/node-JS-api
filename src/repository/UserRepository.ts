@@ -95,7 +95,7 @@ export class UserRepository {
       authUserId = data.user.id;
 
       // 🔹 Especificar el esquema donde se guardará el usuario
-      const schemaName = "acueducto11"; // Puedes cambiarlo dinámicamente
+      const schemaName = "public"; // Puedes cambiarlo dinámicamente
 
       const passwordHashed = bcrypt.hashSync(user.password, 10);
 
@@ -106,8 +106,7 @@ export class UserRepository {
           password: passwordHashed ?? "",
           email: user.email ?? "",
           name: user.name ?? "",
-          lastname: user.lastname ?? "",
-          roleId: user.roles?.id ?? 2,
+          lastname: user.lastname ?? "",          
           phone: user.phone ?? "",
           mobile: user.mobile ?? "",
           address: user.address ?? "",
@@ -115,15 +114,17 @@ export class UserRepository {
 
       // 🔹 Guardar el usuario en el esquema especificado
       const savedUser = await queryRunner.manager
-          .createQueryBuilder()
-          .insert()
-          .into(`${schemaName}.users`) // 🔹 Esquema dinámico
-          .values(newUser)
-          .execute();
+        .createQueryBuilder()
+        .insert()
+        .into(`${schemaName}.users`) // 🔹 Esquema dinámico
+        .values(newUser)
+        .returning('*') // 🔹 Devuelve el usuario insertado
+        .execute();
 
-      await queryRunner.commitTransaction(); // 🔹 Confirmar transacción
+        
+        await queryRunner.commitTransaction(); 
 
-      return savedUser;
+        return savedUser.raw[0];
 
     } catch (error) {
       await queryRunner.rollbackTransaction(); // 🔹 Revertir cambios en `public.users`
